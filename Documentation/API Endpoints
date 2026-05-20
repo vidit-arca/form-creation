@@ -1,0 +1,59 @@
+# HaloFormCraft — API Endpoints Spec
+
+This document details all available API endpoints across the HaloFormCraft project-centric multi-tenant architecture.
+
+---
+
+## 1. Project Management Endpoints (Admin)
+These endpoints manage the project container hierarchy.
+
+| Method | Route | Purpose |
+| :--- | :--- | :--- |
+| **POST** | `/api/admin/projects` | Creates a new project container (e.g., Clinical Trials, Longevity Research). |
+| **GET** | `/api/admin/projects` | Lists all active multi-tenant projects. |
+| **GET** | `/api/admin/projects/{project_id}` | Retrieves detail of a specific project. |
+| **PUT** | `/api/admin/projects/{project_id}` | Updates metadata (name, description, slug) of a project. |
+| **DELETE** | `/api/admin/projects/{project_id}` | Soft-deletes a project container. |
+| **GET** | `/api/admin/projects/{project_id}/stats` | Compiles project-level dashboard reporting stats (e.g., active hospital list, form count, total submission counters). |
+
+---
+
+## 2. Hospital / Site Infrastructure Endpoints (Admin)
+These endpoints map active clinical clinics, hospitals, or centers to specific project workspaces.
+
+| Method | Route | Purpose |
+| :--- | :--- | :--- |
+| **POST** | `/api/admin/projects/{project_id}/hospitals` | Creates and registers a new hospital site/center inside a specific project container. |
+| **GET** | `/api/admin/projects/{project_id}/hospitals` | Lists all registered hospitals/clinics inside a specific project. |
+| **GET** | `/api/admin/hospitals/{hospital_id}` | Retrieves detail of a single hospital record. |
+| **PUT** | `/api/admin/hospitals/{hospital_id}` | Updates hospital attributes (name, site_code, active camps). |
+| **DELETE** | `/api/admin/projects/{project_id}/hospitals/{hospital_id}` | Soft-deletes/unregisters a hospital site from a project environment. |
+
+---
+
+## 3. Form Definition Lifecycle Endpoints (Admin)
+Endpoints handling form creation, logic editing, and version publishing.
+
+| Method | Route | Purpose |
+| :--- | :--- | :--- |
+| **POST** | `/api/admin/projects/{project_id}/forms` | Creates a new form definition scoped to a project container. |
+| **GET** | `/api/admin/projects/{project_id}/forms` | Lists all forms registered under a specific project context. |
+| **POST** | `/api/admin/forms` | Standard legacy fallback route to create a global form. |
+| **GET** | `/api/admin/forms` | Lists all active forms globally. |
+| **GET** | `/api/admin/forms/{form_id}` | Retrieves a single form config along with its structural hierarchy. |
+| **PUT** | `/api/admin/forms/{form_id}/versions/{version_id}` | Updates schema, logic, and UI elements of a specific Form draft version. |
+| **POST** | `/api/admin/forms/{form_id}/publish` | Transition a form draft version from `DRAFT` to `PUBLISHED` (closes former version). |
+| **GET** | `/api/admin/forms/{form_id}/submissions` | Lists all clinical submissions collected specifically for a form. |
+| **GET** | `/api/admin/forms/{form_id}/export` | Extracts compiled CSV/JSON records of form submissions. |
+
+---
+
+## 4. Patient Facing Portal Endpoints (Client UI)
+Context-aware, safe patient/collector endpoints.
+
+| Method | Route | Purpose |
+| :--- | :--- | :--- |
+| **GET** | `/api/patient/forms` | Queries published forms. Automatically accepts `?project=SLUG` and `?site=CODE` search filters to deliver project-isolated forms. |
+| **GET** | `/api/patient/forms/{form_id}` | Fetches active schema, conditional layout, and validation rules of a form. |
+| **POST** | `/api/patient/forms/{form_id}/submissions` | Persists a patient record. Injects `?project=SLUG&site=CODE&center=CAMP` parameters to auto-tag submission metadata. |
+| **GET** | `/api/patient/submissions` | Fetches submission history list completed from the user session. |

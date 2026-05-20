@@ -1,0 +1,561 @@
+# HaloFormCraft — Project-Centric Migration Plan
+
+> Migrating from `Hospital → Project → Form` to `Project → Hospital(s) → Form`
+
+---
+
+## ⚠️ Golden Rule: Form Lifecycle Is Untouched
+
+> [!IMPORTANT]
+> The **entire existing form creation, versioning, and publishing pipeline remains exactly as-is.** Nothing about how a form is created, how its schema/UI/logic is edited, how drafts become published versions, or how archived versions are handled will change.
+
+The current form lifecycle that is **preserved without modification**:
+
+```mermaid
+graph LR
+    A["Create Form"] --> B["FormVersion v1 (DRAFT)"]
+    B --> C["Edit Schema / UI / Logic"]
+    C --> D["Publish"]
+    D --> E["v1 → PUBLISHED"]
+    D --> F["v2 → new DRAFT"]
+    E --> G["Patient fills form"]
+    G --> H["Submission saved"]
+```
+
+**What stays the same:**
+- `Form` model structure (title, description, created_by, is_active)
+- `FormVersion` model (schema, ui_schema, logic_schema, status lifecycle: DRAFT → PUBLISHED → ARCHIVED)
+- `Submission` model (form_version_id, patient_id, data, submitted_at)
+- All existing form CRUD APIs (`POST /api/admin/forms`, `PUT .../versions/{id}`, `POST .../publish`)
+- The Form Builder UI — drag-and-drop, field configuration, preview, conditional logic
+- The Patient form-filling experience
+
+**What is being added (layered on top):**
+- `Project` and `Hospital` as **organizational wrappers** around existing forms
+- A `project_id` FK on `Form` (nullable — existing forms still work without it)
+- Metadata columns on `Submission` for tracking origin (`project_id`, `hospital_id`, `center_id`, `submitted_by`)
+- New Admin UI pages **upstream** of the existing FormBuilder flow
+
+---
+
+## Current State Audit
+
+| Layer | File(s) | Current State |
+|---|---|---|
+| **Models** | [models.py](file:///Users/apple/Desktop/form-creation/backend/models.py) | `User`, `Form`, `FormVersion`, `Submission` — **No Project or Hospital models exist** |
+| **Schemas** | [schemas.py](file:///Users/apple/Desktop/form-creation/backend/schemas.py) | Pydantic schemas for Form, FormVersion, Submission only |
+| **API** | [main.py](file:///Users/apple/Desktop/form-creation/backend/main.py) | Flat CRUD — forms are global, no scoping by project or hospital |
+| **Admin UI** | [Dashboard.jsx](file:///Users/apple/Desktop/form-creation/admin-ui/src/pages/Dashboard.jsx), [FormBuilder.jsx](file:///Users/apple/Desktop/form-creation/admin-ui/src/pages/FormBuilder.jsx), [Responses.jsx](file:///Users/apple/Desktop/form-creation/admin-ui/src/pages/Responses.jsx) | 3 pages — Dashboard, Builder, Responses. No hierarchy UI |
+| **Patient UI** | [App.jsx](file:///Users/apple/Desktop/form-creation/patient-ui/src/App.jsx) | Monolithic 42KB file. No site/project awareness |
+| **Database** | [database.py](file:///Users/apple/Desktop/form-creation/backend/database.py) | SQLite, no foreign keys for projects/hospitals |
+
+> [!WARNING]
+> The current database (`forms.db`) has **no concept of Projects or Hospitals**. All forms and submissions are flat, global records. This migration adds organizational layers without modifying the core form engine.
+
+---
+
+## Phase 1: Backend — Database & Models
+**Duration:** 2–3 days · **Risk:** Medium (schema migration)
+
+### Goal
+Introduce `Project` and `Hospital` as **new, standalone models**. Link them to the existing `Form` and `Submission` models via **nullable foreign keys** so that all existing data continues to work with zero changes.
+
+> [!NOTE]
+> The `Form`, `FormVersion`, and `Submission` models are **not structurally modified**. We are only adding optional FK columns alongside the existing fields.
+
+### 1.1 New SQLAlchemy Models
+
+Add to [models.py](file:///Users/apple/Desktop/form-creation/backend/models.py):
+
+```python
+class Project(Base):
+    __tablename__ = "projects"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)                    # "Longevity Pilot 2026"
+    slug = Column(String, unique=True, index=True)        # "LON_2026"
+    description = Column(String, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    hospitals = relationship("Hospital", back_populates="project")
+    forms = relationship("Form", back_populates="project")
+
+
+class Hospital(Base):
+    __tablename__ = "hospitals"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)                     # "Baptist Hospital Bangalore"
+    site_code = Column(String, unique=True, index=True)   # "BPA"
+    project_id = Column(Integer, ForeignKey("projects.id"))
+    address = Column(String, nullable=True)
+    contact_info = Column(JSON, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    project = relationship("Project", back_populates="hospitals")
+    submissions = relationship("Submission", back_populates="hospital")
+```
+
+### 1.2 Add Optional Columns to Existing Models (Non-Breaking)
+
+These are **additive-only** changes. All existing columns and relationships remain untouched.
+
+```diff
+ # Form model — add OPTIONAL project_id FK (nullable, no impact on existing forms)
+ class Form(Base):
+     __tablename__ = "forms"
+     # ALL existing columns stay exactly as-is:
+     # id, title, description, created_by, is_active, created_at
+     # ALL existing relationships stay exactly as-is:
+     # versions = relationship("FormVersion", ...)
+     ...
++    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)  # ← NEW, optional
++    project = relationship("Project", back_populates="forms")               # ← NEW
+
+ # Submission model — add OPTIONAL metadata columns (nullable, no impact on existing submissions)
+ class Submission(Base):
+     __tablename__ = "submissions"
+     # ALL existing columns stay exactly as-is:
+     # id, form_version_id, patient_id, data, submitted_at
+     # ALL existing relationships stay exactly as-is:
+     # version = relationship("FormVersion", ...)
+     ...
++    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)   # ← NEW, optional
++    hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=True) # ← NEW, optional
++    center_id = Column(String, nullable=True)          # ← NEW, free-text for camps/sub-locations
++    submitted_by = Column(String, nullable=True)       # ← NEW, identifier of the data collector
++
++    hospital = relationship("Hospital", back_populates="submissions")       # ← NEW
+```
+
+> [!TIP]
+> Because all new columns are `nullable=True`, the existing form creation, versioning, publishing, and submission flows continue to work **with zero code changes**. Forms without a project simply have `project_id = NULL`.
+
+### 1.3 Migration Script
+
+Create `backend/migrate.py` to handle existing data:
+
+```python
+"""
+Migration script: assigns all existing forms/submissions to a
+default 'General' project so nothing is orphaned.
+"""
+# 1. Create a default Project (slug: "GEN_DEFAULT")
+# 2. UPDATE forms SET project_id = default_project.id WHERE project_id IS NULL
+# 3. UPDATE submissions SET project_id = default_project.id WHERE project_id IS NULL
+```
+
+### 1.4 Deliverables
+
+- [ ] `Project` model with slug, name, description, relationships
+- [ ] `Hospital` model with site_code, project FK, contact info
+- [ ] `Form.project_id` foreign key added
+- [ ] `Submission` metadata columns added (`project_id`, `hospital_id`, `center_id`, `submitted_by`)
+- [ ] `migrate.py` script — safe migration of existing data
+- [ ] Verify with `python -c "from models import *; print('OK')"`
+
+---
+
+## Phase 2: Backend — API Layer
+**Duration:** 3–4 days · **Risk:** Low
+
+### Goal
+Build **new** CRUD endpoints for Projects and Hospitals. **All existing form and submission endpoints remain unchanged** — we add new project-scoped routes alongside them.
+
+### 2.1 New Pydantic Schemas
+
+Add to [schemas.py](file:///Users/apple/Desktop/form-creation/backend/schemas.py):
+
+```python
+# ── Project Schemas ──
+class ProjectBase(BaseModel):
+    name: str
+    slug: str
+    description: Optional[str] = None
+
+class ProjectCreate(ProjectBase):
+    pass
+
+class HospitalSummary(BaseModel):
+    id: int
+    name: str
+    site_code: str
+    model_config = ConfigDict(from_attributes=True)
+
+class Project(ProjectBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    hospitals: List[HospitalSummary] = []
+    model_config = ConfigDict(from_attributes=True)
+
+# ── Hospital Schemas ──
+class HospitalBase(BaseModel):
+    name: str
+    site_code: str
+    address: Optional[str] = None
+    contact_info: Optional[Dict[str, Any]] = None
+
+class HospitalCreate(HospitalBase):
+    pass
+
+class Hospital(HospitalBase):
+    id: int
+    project_id: int
+    is_active: bool
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+```
+
+### 2.2 New API Endpoints
+
+Add to [main.py](file:///Users/apple/Desktop/form-creation/backend/main.py):
+
+| Method | Route | Purpose |
+|---|---|---|
+| `POST` | `/api/admin/projects` | Create a new Project |
+| `GET` | `/api/admin/projects` | List all Projects |
+| `GET` | `/api/admin/projects/{id}` | Get Project details + hospitals |
+| `PUT` | `/api/admin/projects/{id}` | Update Project |
+| `DELETE` | `/api/admin/projects/{id}` | Soft-delete Project |
+| `POST` | `/api/admin/projects/{id}/hospitals` | Map a Hospital to a Project |
+| `GET` | `/api/admin/projects/{id}/hospitals` | List Hospitals under a Project |
+| `DELETE` | `/api/admin/projects/{id}/hospitals/{hid}` | Remove Hospital mapping |
+| `GET` | `/api/admin/projects/{id}/forms` | List Forms scoped to a Project |
+
+### 2.3 Existing Endpoints — KEPT AS-IS + New Parallel Route
+
+> [!IMPORTANT]
+> **No existing endpoints are modified or removed.** The original `/api/admin/forms` route continues to work for backward compatibility. We add a **new parallel route** for project-scoped form creation.
+
+```python
+# ✅ EXISTING — stays exactly as-is (forms without project context)
+@app.post("/api/admin/forms", response_model=schemas.Form)
+def create_form(form: schemas.FormCreate, ...):
+    db_form = models.Form(**form.model_dump(), created_by=admin.id)
+    ...  # unchanged
+
+# ✅ EXISTING — all other form routes stay untouched:
+# GET  /api/admin/forms
+# GET  /api/admin/forms/{form_id}
+# PUT  /api/admin/forms/{form_id}/versions/{version_id}
+# POST /api/admin/forms/{form_id}/publish
+# GET  /api/admin/forms/{form_id}/submissions
+# GET  /api/admin/forms/{form_id}/export
+
+# 🆕 NEW — project-scoped form creation (sets project_id on the form)
+@app.post("/api/admin/projects/{project_id}/forms", response_model=schemas.Form)
+def create_project_form(project_id: int, form: schemas.FormCreate, ...):
+    db_form = models.Form(**form.model_dump(), created_by=admin.id, project_id=project_id)
+    ...
+
+# 🆕 UPDATED — submission endpoint gains OPTIONAL query params
+# Existing calls without params still work identically
+@app.post("/api/patient/forms/{form_id}/submissions", response_model=schemas.Submission)
+def submit_form(form_id: int, submission: schemas.SubmissionCreate,
+                project: str = Query(None),   # optional
+                site: str = Query(None),       # optional
+                center: str = Query(None),     # optional
+                ...):
+    # If params are provided, resolve and attach metadata
+    # If params are absent, submission works exactly as before
+```
+
+### 2.4 Patient API — Context-Aware Filtering
+
+```python
+@app.get("/api/patient/forms")
+def get_published_forms(
+    project: str = Query(None),   # slug filter
+    site: str = Query(None),      # site_code filter
+    db: Session = Depends(get_db)
+):
+    query = db.query(Form).join(FormVersion).filter(
+        FormVersion.status == "PUBLISHED"
+    )
+    if project:
+        query = query.join(Project).filter(Project.slug == project)
+    if site:
+        query = query.join(Hospital).filter(Hospital.site_code == site)
+    ...
+```
+
+### 2.5 Deliverables
+
+- [ ] Project CRUD endpoints (create, read, update, soft-delete)
+- [ ] Hospital CRUD endpoints (create under project, list, remove)
+- [ ] Form creation scoped to `project_id`
+- [ ] Submission API injects `project_id`, `hospital_id`, `center_id`, `submitted_by`
+- [ ] Patient forms API supports `?project=` and `?site=` query filters
+- [ ] CSV export includes metadata columns
+- [ ] All existing endpoints remain backward-compatible
+
+---
+
+## Phase 3: Admin UI — Project Management
+**Duration:** 4–5 days · **Risk:** Medium (largest UI change)
+
+### Goal
+Add new Project & Hospital management pages **upstream** of the existing form flow. The FormBuilder and its internal behavior are **not modified**.
+
+> [!IMPORTANT]
+> **FormBuilder.jsx is NOT changed internally.** The drag-and-drop builder, field configuration, schema editing, preview, conditional logic, version management, and publish flow all remain exactly as they are today. We only change **how you navigate to** the builder (through a project context) and **which `project_id`** gets attached to the form record on creation.
+
+### 3.1 New Routes
+
+Update [App.jsx](file:///Users/apple/Desktop/form-creation/admin-ui/src/App.jsx):
+
+```jsx
+<Routes>
+  {/* NEW — Project management pages (added upstream) */}
+  <Route path="/" element={<ProjectList />} />
+  <Route path="/projects/:projectId" element={<ProjectDashboard />} />
+  <Route path="/projects/:projectId/hospitals" element={<HospitalManager />} />
+
+  {/* EXISTING — Form routes now nested under project context */}
+  {/* FormBuilder and Responses components are IDENTICAL internally */}
+  <Route path="/projects/:projectId/builder/:id" element={<FormBuilder />} />
+  <Route path="/projects/:projectId/responses/:id" element={<Responses />} />
+</Routes>
+```
+
+### 3.2 New Pages to Create
+
+| Page | File | Description | Modifies existing code? |
+|---|---|---|---|
+| **ProjectList** | `pages/ProjectList.jsx` | Cards view of all projects with create modal | **No** — brand new page |
+| **ProjectDashboard** | `pages/ProjectDashboard.jsx` | Overview: hospital count, form count, submission stats, links to builder | **No** — brand new page |
+| **HospitalManager** | `pages/HospitalManager.jsx` | Add/remove hospitals to the project, assign site codes | **No** — brand new page |
+
+### 3.3 Navigation Flow
+
+```mermaid
+graph LR
+    A["Projects List"] --> B["Project Dashboard"]
+    B --> C["Hospitals Manager"]
+    B --> D["Forms List (within project)"]
+    D --> E["Form Builder ← UNCHANGED"]
+    D --> F["Responses ← UNCHANGED"]
+    style E fill:#2d6a4f,stroke:#1b4332,color:#fff
+    style F fill:#2d6a4f,stroke:#1b4332,color:#fff
+```
+
+### 3.4 What Changes vs. What Doesn't
+
+| Component | Change? | Detail |
+|---|---|---|
+| `ProjectList.jsx` | 🆕 New | Full project CRUD UI |
+| `ProjectDashboard.jsx` | 🆕 New | Stats + navigation hub |
+| `HospitalManager.jsx` | 🆕 New | Hospital mapping UI |
+| `Dashboard.jsx` | 🔄 Refactored | Becomes the forms list within `ProjectDashboard` |
+| **`FormBuilder.jsx`** | **❌ No change** | **Drag-and-drop, schema editing, publish — all untouched** |
+| **`Responses.jsx`** | **Minimal** | Add optional hospital/center filter dropdown (additive only) |
+| `App.jsx` | 🔄 Updated | Route structure updated |
+
+### 3.5 UI Components Needed
+
+- `ProjectCard` — displays project name, slug, hospital count, form count
+- `HospitalRow` — site code badge, name, action buttons
+- `ProjectSidebar` — persistent navigation within a project context
+- `SiteCodeGenerator` — auto-suggests 3-letter codes from hospital names
+
+### 3.6 Deliverables
+
+- [ ] `ProjectList.jsx` — list, create, soft-delete projects
+- [ ] `ProjectDashboard.jsx` — stats overview, quick actions, form list
+- [ ] `HospitalManager.jsx` — add/remove hospitals, assign site codes
+- [ ] `Dashboard.jsx` refactored into form listing within project scope
+- [ ] `Responses.jsx` — optional hospital/center filter (additive only)
+- [ ] Sidebar navigation within project scope
+- [ ] Updated `App.jsx` routing
+- [ ] **FormBuilder.jsx — ZERO internal changes**
+
+---
+
+## Phase 4: Patient UI — Context Awareness & QR
+**Duration:** 3–4 days · **Risk:** Low-Medium
+
+### Goal
+Make the Patient UI read `project` and `site` from URL parameters, lock context, and submit tagged data.
+
+### 4.1 URL Parameter Handling
+
+The Patient App must parse and persist context from QR-generated URLs:
+
+```
+https://patient.haloform.com/fill/5?project=LON_2026&site=BPA&center=camp_A
+```
+
+```javascript
+// On app load — extract and lock context
+const params = new URLSearchParams(window.location.search);
+const context = {
+  project: params.get('project'),
+  site: params.get('site'),
+  center: params.get('center')
+};
+localStorage.setItem('haloform_context', JSON.stringify(context));
+```
+
+### 4.2 Context-Aware Dashboard
+
+- Filter forms by `?project=LON_2026&site=BPA`
+- Display project name and hospital branding at top
+- Show only forms assigned to the current project
+
+### 4.3 Submission Metadata Injection
+
+On form submit, silently attach the locked context:
+
+```javascript
+const submit = async (formData) => {
+  const context = JSON.parse(localStorage.getItem('haloform_context'));
+  await fetch(`/api/patient/forms/${formId}/submissions?` + new URLSearchParams({
+    project: context.project,
+    site: context.site,
+    center: context.center || ''
+  }), {
+    method: 'POST',
+    body: JSON.stringify({ data: formData })
+  });
+};
+```
+
+### 4.4 QR Code Generation (Admin Side)
+
+Add to the Admin UI's Form Builder publish flow:
+
+```javascript
+// After publishing, generate context-aware URLs
+const publishUrl = `https://patient.haloform.com/fill/${formId}?project=${project.slug}&site=${hospital.site_code}`;
+
+// Generate QR code using qrcode.react or similar
+<QRCodeSVG value={publishUrl} size={256} />
+```
+
+### 4.5 Deliverables
+
+- [ ] URL parameter parsing + `localStorage` context locking
+- [ ] Filtered form listing by project/site
+- [ ] Silent metadata injection on every submission
+- [ ] QR code generation in Admin UI (per-hospital, per-form)
+- [ ] Site-specific branding header (hospital logo, name)
+- [ ] Context reset/switch mechanism for field workers
+
+---
+
+## Phase 5: Production & Reporting
+**Duration:** 3–5 days · **Risk:** Medium
+
+### Goal
+Migrate to PostgreSQL, implement row-level security, and build cross-site reporting.
+
+### 5.1 PostgreSQL Migration
+
+Update [database.py](file:///Users/apple/Desktop/form-creation/backend/database.py):
+
+```diff
+-SQLALCHEMY_DATABASE_URL = "sqlite:///./forms.db"
++SQLALCHEMY_DATABASE_URL = os.getenv(
++    "DATABASE_URL",
++    "postgresql://haloform:password@localhost:5432/haloform_db"
++)
+-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
++engine = create_engine(SQLALCHEMY_DATABASE_URL)
+```
+
+### 5.2 Row-Level Security (RLS)
+
+```sql
+-- PostgreSQL RLS policy
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY hospital_isolation ON submissions
+  USING (hospital_id = current_setting('app.current_hospital_id')::integer);
+```
+
+### 5.3 Reporting Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/admin/projects/{id}/report` | Aggregate stats across all hospitals |
+| `GET /api/admin/projects/{id}/report?site=BPA` | Hospital-specific breakdown |
+| `GET /api/admin/projects/{id}/export?format=xlsx` | Full Excel export with metadata columns |
+
+### 5.4 Data Export Format
+
+```
+| Submission ID | Project | Hospital | Center | Submitted By | Submitted At | Field 1 | Field 2 | ... |
+|---|---|---|---|---|---|---|---|---|
+| 1 | LON_2026 | BPA | camp_A | user_123 | 2026-05-13 | 22 | 19.4 | ... |
+| 2 | LON_2026 | MSR | main | user_456 | 2026-05-13 | 35 | 24.1 | ... |
+```
+
+### 5.5 Deliverables
+
+- [ ] PostgreSQL connection + env-based config
+- [ ] Alembic migration scripts for schema versioning
+- [ ] Row-level security policies
+- [ ] Project-level aggregate reporting endpoint
+- [ ] Hospital-level filtered reporting endpoint
+- [ ] Multi-format export (CSV, XLSX) with all metadata columns
+- [ ] Docker Compose updated with PostgreSQL service
+
+---
+
+## Summary Timeline
+
+```mermaid
+gantt
+    title HaloFormCraft Migration — Project-Centric Architecture
+    dateFormat YYYY-MM-DD
+    axisFormat %b %d
+
+    section Phase 1: Models
+    New models & migration     :p1, 2026-05-16, 3d
+
+    section Phase 2: API
+    CRUD endpoints & filters   :p2, after p1, 4d
+
+    section Phase 3: Admin UI
+    Project management pages   :p3, after p2, 5d
+
+    section Phase 4: Patient UI
+    Context awareness & QR     :p4, after p2, 4d
+
+    section Phase 5: Production
+    PostgreSQL & reporting     :p5, after p3, 5d
+```
+
+| Phase | Duration | Dependencies | Key Risk |
+|---|---|---|---|
+| **Phase 1** — Models & Migration | 2–3 days | None | Existing data migration |
+| **Phase 2** — API Layer | 3–4 days | Phase 1 | Backward compatibility |
+| **Phase 3** — Admin UI | 4–5 days | Phase 2 | Largest scope |
+| **Phase 4** — Patient UI | 3–4 days | Phase 2 | Can run parallel with Phase 3 |
+| **Phase 5** — Production | 3–5 days | Phases 3 & 4 | PostgreSQL migration |
+| **Total** | **~15–21 days** | | |
+
+> [!TIP]
+> **Phase 3 and Phase 4 can run in parallel** after Phase 2 is complete, potentially shaving 3–4 days off the total timeline.
+
+---
+
+## Quick Reference: File Change Map
+
+| File | Phase | Change Type |
+|---|---|---|
+| `backend/models.py` | 1 | Add `Project`, `Hospital` models; update `Form`, `Submission` |
+| `backend/schemas.py` | 2 | Add Project, Hospital schemas; update Submission schema |
+| `backend/main.py` | 2 | Add 9+ new endpoints; update existing form/submission routes |
+| `backend/database.py` | 5 | Switch to PostgreSQL |
+| `backend/migrate.py` | 1 | **New** — data migration script |
+| `admin-ui/src/App.jsx` | 3 | Restructure routes to be project-scoped |
+| `admin-ui/src/pages/ProjectList.jsx` | 3 | **New** — project listing page |
+| `admin-ui/src/pages/ProjectDashboard.jsx` | 3 | **New** — project overview |
+| `admin-ui/src/pages/HospitalManager.jsx` | 3 | **New** — hospital mapping page |
+| `admin-ui/src/pages/Dashboard.jsx` | 3 | Refactor into `ProjectDashboard` |
+| `admin-ui/src/pages/FormBuilder.jsx` | 3 | Add project context, QR generation |
+| `admin-ui/src/pages/Responses.jsx` | 3 | Add hospital/center filters |
+| `patient-ui/src/App.jsx` | 4 | Add context parsing, filtering, metadata injection |

@@ -1,0 +1,37 @@
+# Offline Mode Implementation Plan (PWA)
+
+To make the Patient UI fully functional without an internet connection, we need to transform it into a **Progressive Web App (PWA)** with an "Offline-First" architecture. Here is the step-by-step plan to achieve this without losing any data.
+
+## 1. Local Database (IndexedDB)
+Local data storage is crucial. `localStorage` is too limited for large form schemas and signatures, so we will use **IndexedDB** (via a lightweight wrapper like `idb` or `localforage`).
+
+* **Store Form Configurations:** When the app is online, it will fetch all available forms from the backend and save them to IndexedDB. If the user goes offline, the app reads the form schemas from this local database to render the UI.
+* **Store Submissions (Queue):** When a user hits "Submit" while offline, the payload is saved locally to an `offline_submissions` table in IndexedDB, marked with a "Pending" status.
+
+## 2. Progressive Web App (PWA) Setup
+To ensure the web app itself loads when there is no Wi-Fi, we must cache the HTML, CSS, JavaScript, and assets.
+
+* **Vite PWA Plugin:** We will install `vite-plugin-pwa` in the `patient-ui`.
+* **Service Worker:** The plugin will generate a Service Worker that caches all critical application files.
+* **Manifest:** We will add a `manifest.json` so users can "Install" the app to their device home screen (making it look and feel like a native mobile app).
+
+## 3. Network Detection & UI Feedback
+Users need to know when they are offline and if their data is pending.
+
+* **State Listeners:** Implement `window.addEventListener('online')` and `window.addEventListener('offline')` to track network status.
+* **UI Indicators:** Add a subtle banner at the top of the app indicating "Offline Mode" when the connection drops.
+* **History Page Updates:** Update the "My Submissions" page to show which forms are successfully sent and which are "Pending Sync".
+
+## 4. Background Sync Mechanism
+When the internet connection is restored, we need to send the offline data to the backend.
+
+* **Auto-Sync:** As soon as the `online` event fires, a background process reads all records from the `offline_submissions` IndexedDB table and sends them to the backend API.
+* **Manual Sync:** Provide a manual "Sync Now" button on the Dashboard for users to force a sync attempt.
+* **Cleanup:** Once a submission successfully reaches the database, it is deleted from the local offline queue.
+
+## Open Questions & User Review
+
+1. **Scope:** Do you want this implemented only for the **Patient UI** (so patients can fill forms offline), or do you also need the Admin Builder to work offline? (Usually, only the data collection side needs offline support).
+2. **Media/Signatures:** Since signatures are base64 strings, they are easily saved to IndexedDB. If we later add heavy file/image uploads, are you okay with limiting large file uploads during offline mode, or should we queue those locally too?
+
+**Let me know if this plan sounds good, and I will start executing it!**
