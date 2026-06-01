@@ -11,6 +11,7 @@ import { validateCohortRules } from './components/validateCohortRules';
 import { CohortInputComponent } from './components/CohortInputComponent';
 import { HomePage } from './components/HomePage';
 import Select from 'react-select';
+import { addSubmissionToQueue, formCacheStore } from './utils/storage';
 
 const reactSelectPatientStyles = {
   control: (base, state) => ({
@@ -46,7 +47,7 @@ const reactSelectPatientStyles = {
   }),
 };
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // ── Context Helper: Read/Write site context from URL params + localStorage ──
 function getSiteContext() {
@@ -124,11 +125,49 @@ function Dashboard() {
 
     fetch(url)
       .then(res => res.json())
-      .then(data => {
+      .then(async (data) => {
         setForms(data);
         setLoading(false);
+        
+        // Pre-cache all forms in the background for offline capability
+        for (const f of data) {
+          try {
+            const resForm = await fetch(`${API_URL}/patient/forms/${f.id}`);
+            if (resForm.ok) {
+              const fullForm = await resForm.json();
+              // Tag cached form with project slug and site code for easy offline filtering
+              fullForm.project_slug = context.project;
+              fullForm.site_code = context.site;
+              await formCacheStore.setItem(f.id.toString(), fullForm);
+            }
+          } catch (e) {
+            console.warn('Pre-caching failed for form:', f.id, e);
+          }
+        }
       })
-      .catch(() => setLoading(false));
+      .catch(async () => {
+        // Offline / Fetch failed: load cached forms
+        try {
+          const cachedForms = [];
+          await formCacheStore.iterate((value) => {
+            // Filter forms offline by matching cached project slug with current scanned context
+            if (value && (!context.project || value.project_slug === context.project)) {
+              cachedForms.push({
+                id: value.form_id || value.id,
+                title: value.title,
+                description: value.description,
+                project_slug: value.project_slug
+              });
+            }
+          });
+          if (cachedForms.length > 0) {
+            setForms(cachedForms);
+          }
+        } catch (e) {
+          console.error('Failed to load cached forms:', e);
+        }
+        setLoading(false);
+      });
   }, [context]);
 
   const clearContext = () => {
@@ -291,20 +330,39 @@ function FormRenderer() {
   const formValues = useWatch({ control });
 
   useEffect(() => {
-    fetch(`${API_URL}/patient/forms/${id}`)
-      .then(res => {
+    const loadForm = async () => {
+      try {
+        // Try fetching online
+        const res = await fetch(`${API_URL}/patient/forms/${id}`);
         if (!res.ok) throw new Error("Form not found");
-        return res.json();
-      })
-      .then(data => {
+        const data = await res.json();
+        
+        // Cache form schema for offline use
+        await formCacheStore.setItem(id.toString(), data);
+        
         setFormConfig(data);
         reset({}); // IMPORTANT: Wipe any old data from previous sessions
         setLoading(false);
-      })
-      .catch(err => {
-        alert("Error loading form or form not published.");
+      } catch (err) {
+        console.warn("Online form fetch failed, trying local cache...", err);
+        try {
+          const cachedData = await formCacheStore.getItem(id.toString());
+          if (cachedData) {
+            setFormConfig(cachedData);
+            reset({});
+            setLoading(false);
+            return;
+          }
+        } catch (cacheErr) {
+          console.error("Cache read failed:", cacheErr);
+        }
+        
+        alert("Error loading form or form not published. Please check your internet connection.");
         navigate('/');
-      });
+      }
+    };
+
+    loadForm();
   }, [id, navigate]);
 
   // Split schema into pages and handle Exclusive Stop Criteria
@@ -435,19 +493,46 @@ function FormRenderer() {
       const metaQuery = metaParams.toString();
       const submitUrl = `${API_URL}/patient/forms/${id}/submissions${metaQuery ? '?' + metaQuery : ''}`;
 
-      const res = await fetch(submitUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: submissionPayload })
-      });
-      if (res.ok) {
-        alert("Form submitted successfully!");
+      const finalPayload = {
+        formId: id,
+        formTitle: formConfig?.title || 'Unknown Form',
+        payload: submissionPayload,
+        targetUrl: submitUrl // To be used by sync worker
+      };
+
+      if (!navigator.onLine) {
+        // Offline Queuing
+        await addSubmissionToQueue(finalPayload);
+        alert("⚠️ Offline Mode: Form completed successfully! Your answers are saved locally and will automatically sync when you reconnect.");
         navigate('/history');
       } else {
-        alert("Failed to submit form");
+        // Online Submission
+        const res = await fetch(submitUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: submissionPayload })
+        });
+        if (res.ok) {
+          alert("Form submitted successfully!");
+          navigate('/history');
+        } else {
+          // If the server is unreachable (5xx/4xx), maybe we should also queue it?
+          // For now, let's queue it as a fallback.
+          await addSubmissionToQueue(finalPayload);
+          alert("Server issue detected. Saved locally to sync later.");
+          navigate('/history');
+        }
       }
     } catch (e) {
-      alert("Submission error");
+      console.error(e);
+      // Fallback queuing if network error during fetch
+      await addSubmissionToQueue({
+        formId: id,
+        formTitle: formConfig?.title || 'Unknown Form',
+        payload: submissionPayload,
+      });
+      alert("Network error. Saved locally to sync later.");
+      navigate('/history');
     }
   };
 
@@ -962,14 +1047,20 @@ function History() {
   );
 }
 
+import { NetworkStatusBanner } from './components/NetworkStatusBanner';
+import { SubmissionHistory as OfflineHistory } from './components/SubmissionHistory';
+import { IntakeForm } from './components/IntakeForm';
+
 function App() {
   return (
     <Router>
+      <NetworkStatusBanner />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/forms" element={<Dashboard />} />
         <Route path="/fill/:id" element={<FormRenderer />} />
-        <Route path="/history" element={<History />} />
+        <Route path="/history" element={<OfflineHistory />} />
+        <Route path="/demo" element={<IntakeForm />} />
       </Routes>
     </Router>
   );

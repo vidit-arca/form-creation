@@ -1,0 +1,77 @@
+# Cross-City Deployment & Testing Guide
+
+To test the application across different cities, you need to move the application off your local machine (`localhost`) and host it on the public internet. This requires deploying your **FastAPI Backend**, your **React Frontends**, and updating your configuration to connect them.
+
+Here is the most efficient, low-cost strategy to deploy the system for testing.
+
+---
+
+## Phase 1: Prepare the Code for Production
+
+Right now, your React applications are hardcoded to talk to your local computer. We need to make this dynamic.
+
+### 1. Update API URLs
+In both your `patient-ui/src/App.jsx` and `admin-ui` (wherever API calls are made), change the hardcoded `localhost` string to use Vite Environment Variables:
+
+**Change this:**
+```javascript
+const API_URL = 'http://localhost:8000/api';
+```
+
+**To this:**
+```javascript
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+```
+
+### 2. Push to GitHub
+Create a repository on GitHub and push your entire `form-creation` folder to it. Both deployment services we will use integrate directly with GitHub to build your code automatically.
+
+---
+
+## Phase 2: Deploy the FastAPI Backend
+
+For testing, you need a service that can host a Python API. 
+
+### Option: Render.com (Recommended for easy testing)
+1. Create an account on [Render](https://render.com).
+2. Click **New +** and select **Web Service**.
+3. Connect your GitHub repository.
+4. Set the **Root Directory** to `backend`.
+5. Set the **Build Command** to: `pip install -r requirements.txt` (Make sure you have a `requirements.txt` file!).
+6. Set the **Start Command** to: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+7. **Important Note on SQLite:** Render's free tier uses an "ephemeral" disk, meaning your `dynamic_forms.db` will be erased if the server restarts. To prevent this, you can upgrade to a $7/mo plan to attach a **Persistent Disk** to the `/data` folder, or simply swap SQLite for a free PostgreSQL database (like [Neon.tech](https://neon.tech/)).
+
+Once deployed, Render will give you a public URL (e.g., `https://halo-backend.onrender.com`).
+
+---
+
+## Phase 3: Deploy the Frontends (patient-ui & admin-ui)
+
+The best place to host Vite/React applications is **Vercel** or **Netlify**. They are incredibly fast, free, and handle SSL automatically (which is required for Service Workers and offline mode to function!).
+
+### Using Vercel.com
+1. Create an account on [Vercel](https://vercel.com).
+2. Click **Add New Project** and import your GitHub repository.
+3. **Deploy Patient UI:**
+   * Set the **Root Directory** to `patient-ui`.
+   * Open the **Environment Variables** section.
+   * Add Name: `VITE_API_URL` | Value: `https://halo-backend.onrender.com/api` *(Use your actual Render URL)*.
+   * Click **Deploy**.
+4. **Deploy Admin UI:**
+   * Repeat the same process, but set the Root Directory to `admin-ui`.
+
+---
+
+## Phase 4: How to Conduct the Cross-City Test
+
+Once you have your Vercel URLs (e.g., `https://halo-patient.vercel.app`), you are ready to test!
+
+1. **Distribute the Links:** Send the `patient-ui` URL to your field workers or testers in different cities.
+2. **Install the PWA:** Have them open the URL on their iPad, Android tablet, or laptop. Tell them to use the browser menu to **"Add to Home Screen"**. This installs the app natively on their device.
+3. **The Offline Test:**
+   * Have them turn on **Airplane Mode** (or turn off Wi-Fi/Cellular).
+   * Open the installed app. They will see the `⚠️ Offline Mode` banner.
+   * Have them fill out a form, draw a signature, and hit Submit.
+   * Have them turn Airplane Mode **off**.
+   * The app will automatically sync the data to your cloud backend.
+4. **Verify:** You can log into your deployed `admin-ui` (or check the `/history` tab) to instantly see the data arrive from across the country!

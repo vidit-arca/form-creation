@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -36,26 +36,61 @@ export function HomePage() {
   const startScanning = async () => {
     setScanError('');
     setIsScanning(true);
-    try {
-      html5QrCode.current = new Html5Qrcode('home-qr-reader');
-      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-      const onSuccess = (decodedText) => handleScan(decodedText);
-      try {
-        await html5QrCode.current.start({ facingMode: "environment" }, config, onSuccess, () => {});
-      } catch {
-        await html5QrCode.current.start({ facingMode: "user" }, config, onSuccess, () => {});
-      }
-    } catch {
-      setScanError('Could not access camera. Check permissions.');
+
+    if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+      setScanError('Camera access requires HTTPS. Please load this page with https:// in your URL.');
       setIsScanning(false);
+      return;
     }
+
+    // Wait for React to render the container element in the DOM
+    setTimeout(async () => {
+      try {
+        const readerElement = document.getElementById('home-qr-reader');
+        if (!readerElement) {
+          throw new Error('home-qr-reader container not found in DOM');
+        }
+
+        // Trigger native camera permission dialog by requesting cameras first
+        const devices = await Html5Qrcode.getCameras().catch(err => {
+          console.error("getCameras failed", err);
+          throw new Error('Camera permissions denied or blocked. Please reset your browser site permissions.');
+        });
+
+        if (!devices || devices.length === 0) {
+          throw new Error('No camera devices found on this device.');
+        }
+
+        html5QrCode.current = new Html5Qrcode('home-qr-reader');
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        const onSuccess = (decodedText) => handleScan(decodedText);
+
+        // Find the back/rear camera if available
+        const backCamera = devices.find(device => 
+          device.label.toLowerCase().includes('back') || 
+          device.label.toLowerCase().includes('rear') || 
+          device.label.toLowerCase().includes('environment')
+        ) || devices[devices.length - 1]; // Fallback to the last camera (often rear)
+
+        try {
+          await html5QrCode.current.start(backCamera.id, config, onSuccess, () => {});
+        } catch {
+          // Fallback to facingMode if starting by device ID fails
+          await html5QrCode.current.start({ facingMode: "environment" }, config, onSuccess, () => {});
+        }
+      } catch (err) {
+        console.error('Camera initialization failed:', err);
+        setScanError(err.message || 'Could not access camera. Check browser permissions.');
+        setIsScanning(false);
+      }
+    }, 150);
   };
 
   const stopScanning = async () => {
     if (html5QrCode.current?.isScanning) {
       await html5QrCode.current.stop().catch(() => {});
-      setIsScanning(false);
     }
+    setIsScanning(false);
   };
 
   const handleScan = async (url) => {

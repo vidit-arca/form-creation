@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 export function ProjectList() {
   const [projects, setProjects] = useState([]);
@@ -30,19 +30,25 @@ export function ProjectList() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!name.trim() || !slug.trim()) return;
-    const res = await fetch(`${API_URL}/admin/projects`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, slug, description })
-    });
-    if (res.ok) {
-      const newProject = await res.json();
-      setShowModal(false);
-      setName(''); setSlug(''); setDescription('');
-      navigate(`/projects/${newProject.id}`);
-    } else {
-      const err = await res.json();
-      alert(err.detail || 'Failed to create project');
+    try {
+      console.log(`Sending request to: ${API_URL}/admin/projects`);
+      const res = await fetch(`${API_URL}/admin/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, slug, description })
+      });
+      if (res.ok) {
+        const newProject = await res.json();
+        setShowModal(false);
+        setName(''); setSlug(''); setDescription('');
+        navigate(`/projects/${newProject.id}`);
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Failed to create project');
+      }
+    } catch (err) {
+      console.error('Failed to create project:', err);
+      alert(`Network/Connection Error: Could not connect to the backend API at "${API_URL}". Details: ${err.message}`);
     }
   };
 

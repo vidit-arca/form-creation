@@ -1,0 +1,77 @@
+# Technical Documentation: Offline-First Synchronization Architecture
+
+This document provides an end-to-end technical overview of the offline capabilities built into the HaloFormCraft Patient Portal (`patient-ui`). It details the specific technologies used, the offline storage mechanism, and the automated online-offline synchronization engine.
+
+---
+
+## 1. Technology Stack
+
+The offline architecture is built using modern Progressive Web App (PWA) standards, ensuring that data is persisted reliably inside the user's browser without requiring a native mobile app.
+
+* **Vite PWA Plugin (`vite-plugin-pwa`):** Integrates Workbox to automatically cache the application's static assets (HTML, JavaScript, CSS, Fonts). This guarantees the web app will load instantly even if the device is in airplane mode.
+* **IndexedDB (`localforage`):** A lightweight, asynchronous wrapper for the browser's native IndexedDB API. It provides a robust, persistent key-value datastore capable of handling heavy payloads (like Base64 image signatures and GPS coordinates) up to several Gigabytes.
+* **React Hooks & Browser APIs:** The architecture relies on standard HTML5 Web APIs (`navigator.onLine` and `window.addEventListener('online')`) to passively monitor the network status.
+
+---
+
+## 2. How and Where Data is Stored Offline
+
+When the user's device loses connection, the application pivots from a "Server-Request" model to a "Local-Storage" model. This is governed by `src/utils/storage.js`.
+
+### The IndexedDB Datastores
+We initialize three isolated stores, but the primary engine for offline submissions is the `submissionQueueStore` (Internal Name: `submission_queue`).
+
+### The Interception Logic (`App.jsx`)
+When a patient clicks "Submit" at the end of a form, the application executes the following check:
+
+1. **Network Check:** The app checks `navigator.onLine`.
+2. **Payload Construction:** It builds a complete payload containing the form data, the target Form ID, and the exact API endpoint (`targetUrl`) that the backend expects.
+3. **Offline Queuing:** If the network is disconnected, the app skips the `fetch()` call completely. Instead, it calls `addSubmissionToQueue(payload)`.
+4. **Local Insertion:** The payload is injected into IndexedDB with a unique UUID, a timestamp, and a strict state of `syncStatus: "PENDING"`.
+
+```json
+// Example of how data rests locally inside IndexedDB
+{
+  "id": "c8a4b2a3-f123-4567-89ab-cdef01234567",
+  "formId": 13,
+  "formTitle": "General Patient Intake",
+  "payload": { "patient_name": "Jane Doe", "blood_type": "O+" },
+  "targetUrl": "http://localhost:8000/api/patient/forms/13/submissions?site=NYC01",
+  "syncStatus": "PENDING",
+  "retryCount": 0,
+  "errorMessage": null
+}
+```
+
+---
+
+## 3. The Synchronization Engine
+
+The synchronization process bridges the gap between the local IndexedDB queue and the FastAPI backend. It is designed to be fully automated but allows for manual intervention.
+
+### 1. Network Reconnection Detection (`src/utils/useNetworkStatus.js`)
+The React application mounts a global hook that listens to the browser's native `online` and `offline` events. The exact millisecond the tablet regains Wi-Fi or cellular service, the `online` event fires, instantly invoking the `syncPendingSubmissions()` function.
+
+### 2. Processing the Queue (`src/utils/syncQueue.js`)
+When triggered (either automatically or via the manual "Sync Now" button), the Sync Engine performs the following pipeline:
+
+1. **Query:** It asks `localforage` for all records in the `submissionQueueStore`.
+2. **Filter:** It isolates only the records where `syncStatus` is `PENDING` or `FAILED`.
+3. **Iterate:** It loops through the isolated records sequentially.
+4. **Transmit:** For each record, it fires an actual HTTP POST request using the cached `targetUrl` and `payload`.
+
+### 3. State Resolution
+Depending on the response from the FastAPI backend, the Sync Engine updates the local IndexedDB record:
+
+* **Success (HTTP 200-299):** The record is updated to `syncStatus: "SYNCED"`. The data is now safely in the SQL database, and the UI badge turns green. (Optionally, this record can be deleted from local storage to free up space).
+* **Failure (HTTP 4xx / 5xx or Network Drop):** The record is updated to `syncStatus: "FAILED"`. The engine grabs the specific error message (e.g., *422 Unprocessable Entity*), saves it to the `errorMessage` field, and increments the `retryCount`. The UI badge turns red, allowing the user to review what went wrong.
+
+---
+
+## 4. End-to-End Visual User Experience
+
+To prevent user panic when connectivity drops, the UI clearly communicates the system state:
+
+1. **Sticky Network Banner:** If the device drops offline, a bright orange banner appears globally, informing the patient that their data is safe and will sync later.
+2. **Submission History (`src/components/SubmissionHistory.jsx`):** A dashboard where patients or nurses can view all queued items. It actively queries the IndexedDB store and displays live color-coded badges based on the `syncStatus`.
+3. **Manual Sync:** A "Sync Now" button allows users to force the Sync Engine to run. This is crucial for edge cases where the browser's `navigator.onLine` API falsely reports an offline status despite a working connection.

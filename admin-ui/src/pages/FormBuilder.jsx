@@ -8,7 +8,7 @@ import { Canvas } from '../components/builder/Canvas';
 import { SettingsPanel } from '../components/builder/SettingsPanel';
 import { FormPreview } from '../components/preview/FormPreview';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 export function FormBuilder() {
   const { id } = useParams();

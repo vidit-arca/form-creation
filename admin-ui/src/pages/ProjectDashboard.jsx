@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 export function ProjectDashboard() {
   const { projectId } = useParams();
@@ -14,7 +14,7 @@ export function ProjectDashboard() {
   const [title, setTitle] = useState('');
 
   // Patient portal base URL (adjust for production)
-  const PATIENT_BASE = 'http://localhost:5174';
+  const PATIENT_BASE = import.meta.env.VITE_PATIENT_URL || 'http://localhost:5174';
 
   useEffect(() => {
     Promise.all([
