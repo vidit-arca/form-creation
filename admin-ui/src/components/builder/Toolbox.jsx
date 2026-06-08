@@ -7,7 +7,9 @@ export function Toolbox({ addField, searchQuery, setSearchQuery }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === '/' && document.activeElement !== searchInputRef.current) {
+      const activeTag = document.activeElement?.tagName;
+      const isInputFocused = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || document.activeElement?.isContentEditable;
+      if (e.key === '/' && !isInputFocused) {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
