@@ -12,7 +12,7 @@ export function Responses() {
     fetch(`${API_URL}/admin/forms/${id}/submissions`)
       .then(res => res.json())
       .then(data => {
-        setSubmissions(data);
+        setSubmissions(Array.isArray(data) ? data : []);
         setLoading(false);
       });
   }, [id]);

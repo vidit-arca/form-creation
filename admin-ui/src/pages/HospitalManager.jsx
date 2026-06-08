@@ -19,7 +19,7 @@ export function HospitalManager() {
       fetch(`${API_URL}/admin/projects/${projectId}/hospitals`).then(r => r.json()),
     ]).then(([proj, hosps]) => {
       setProject(proj);
-      setHospitals(hosps);
+      setHospitals(Array.isArray(hosps) ? hosps : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   };

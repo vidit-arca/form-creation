@@ -77,6 +77,6 @@ def convert_md_to_pdf(md_file_path, pdf_file_path):
     print(f"Successfully generated Professional PDF: {pdf_file_path}")
 
 if __name__ == "__main__":
-    input_file = "/Users/apple/Desktop/form-creation/Multi_Center_Strategy.md"
-    output_file = "/Users/apple/Desktop/form-creation/Multi_Center_Strategy.pdf"
+    input_file = "/Users/apple/Desktop/form-creation/Diagrams/high_level_design.md"
+    output_file = "/Users/apple/Desktop/form-creation/Diagrams/high_level_design.pdf"
     convert_md_to_pdf(input_file, output_file)

@@ -81,3 +81,60 @@ export const updateSubmission = async (id, updates) => {
 export const removeSubmission = async (id) => {
   await submissionQueueStore.removeItem(id);
 };
+
+// 4. Local drafts storage
+export const draftsStore = localforage.createInstance({
+  name: "HaloFormCraft",
+  storeName: "saved_drafts"
+});
+
+/**
+ * Save a new or existing draft locally.
+ * @param {string|null} draftId 
+ * @param {string} formId 
+ * @param {string} formTitle 
+ * @param {Object} answers 
+ * @returns {Promise<string>} The saved draft's ID
+ */
+export const saveDraft = async (draftId, formId, formTitle, answers) => {
+  const id = draftId || crypto.randomUUID();
+  const draft = {
+    id,
+    formId,
+    formTitle,
+    timestamp: new Date().toISOString(),
+    answers
+  };
+  await draftsStore.setItem(id, draft);
+  return id;
+};
+
+/**
+ * Get a specific draft by ID.
+ * @param {string} id 
+ * @returns {Promise<Object|null>} Draft object or null
+ */
+export const getDraft = async (id) => {
+  return await draftsStore.getItem(id);
+};
+
+/**
+ * Get all drafts sorted by timestamp descending.
+ * @returns {Promise<Array>} Array of saved drafts
+ */
+export const getAllDrafts = async () => {
+  const drafts = [];
+  await draftsStore.iterate((value) => {
+    drafts.push(value);
+  });
+  return drafts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+};
+
+/**
+ * Delete a saved draft by ID.
+ * @param {string} id 
+ */
+export const deleteDraft = async (id) => {
+  await draftsStore.removeItem(id);
+};
+

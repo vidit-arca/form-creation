@@ -15,7 +15,7 @@ export function ProjectList() {
   const fetchProjects = () => {
     fetch(`${API_URL}/admin/projects`)
       .then(res => res.json())
-      .then(data => { setProjects(data); setLoading(false); })
+      .then(data => { setProjects(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   };
 

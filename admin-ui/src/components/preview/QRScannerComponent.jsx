@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-export function QRScannerComponent({ field, onChange, setValue }) {
+export function QRScannerComponent({ field, value, onChange, setValue }) {
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState('');
   const scannerRef = useRef(null);
@@ -106,7 +106,8 @@ export function QRScannerComponent({ field, onChange, setValue }) {
             <input 
               type="text" 
               className="w-full border border-gray-300 p-2.5 rounded-lg bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" 
-              placeholder="Enter fallback text..."
+              placeholder="Enter scanned/fallback text..."
+              value={value || ''}
               onChange={(e) => onChange(e.target.value)}
             />
           </div>

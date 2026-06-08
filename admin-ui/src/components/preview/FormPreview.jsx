@@ -44,10 +44,101 @@ const reactSelectAdminStyles = {
   }),
 };
 
+function evaluateLogic(logic, formValues) {
+  if (!logic) return { isVisible: true, isRequired: false };
+
+  const action = logic.action || 'show';
+  const joinType = logic.joinType || 'AND';
+  let rules = logic.rules || [];
+
+  // Support backward compatibility for old single-rule format
+  if (logic.fieldId) {
+    rules = [{
+      fieldId: logic.fieldId,
+      operator: logic.operator || '==',
+      value: logic.value
+    }];
+  }
+
+  // Filter out invalid rules (no fieldId set yet)
+  const validRules = rules.filter(r => r && r.fieldId);
+
+  if (validRules.length === 0) {
+    return { isVisible: true, isRequired: false };
+  }
+
+  const ruleResults = validRules.map(rule => {
+    const depVal = formValues[rule.fieldId];
+    const targetVal = rule.value;
+    const op = rule.operator || '==';
+
+    // Normalize: arrays (multi_select) → string for comparison
+    let val;
+    if (Array.isArray(depVal)) {
+      val = depVal;
+    } else {
+      val = depVal === undefined || depVal === null ? '' : depVal;
+    }
+
+    let conditionMet = false;
+    if (op === '==') {
+      if (Array.isArray(val)) conditionMet = val.includes(String(targetVal));
+      else conditionMet = (String(val) === String(targetVal));
+    } else if (op === '!=') {
+      if (Array.isArray(val)) conditionMet = !val.includes(String(targetVal));
+      else conditionMet = (String(val) !== String(targetVal));
+    } else if (op === '<') conditionMet = (Number(val) < Number(targetVal));
+    else if (op === '>') conditionMet = (Number(val) > Number(targetVal));
+    else if (op === 'contains') {
+      if (Array.isArray(val)) conditionMet = val.some(v => String(v).toLowerCase().includes(String(targetVal).toLowerCase()));
+      else conditionMet = (val && String(val).toLowerCase().includes(String(targetVal).toLowerCase()));
+    }
+
+    return conditionMet;
+  });
+
+  let overallConditionMet = false;
+  if (joinType === 'OR') {
+    overallConditionMet = ruleResults.some(r => r);
+  } else {
+    overallConditionMet = ruleResults.every(r => r);
+  }
+
+  let isVisible = true;
+  let isRequired = false;
+
+  if (overallConditionMet) {
+    if (action === 'hide') isVisible = false;
+    if (action === 'require') isRequired = true;
+  } else {
+    if (action === 'show') isVisible = false;
+  }
+
+  return { isVisible, isRequired };
+}
+
 export function FormPreview({ schemaData, title }) {
   const { register, control, trigger, setValue, getValues, formState: { errors } } = useForm();
   const formValues = useWatch({ control });
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
+  // Filters options by optionConditions (e.g. GDM only for Female gender)
+  const getVisibleOptions = (field) => {
+    const options = field.options || [];
+    const conditions = field.optionConditions || {};
+    if (Object.keys(conditions).length === 0) return options;
+    return options.filter(opt => {
+      const cond = conditions[opt];
+      if (!cond || !cond.fieldId) return true;
+      const depVal = formValues?.[cond.fieldId] ?? '';
+      const targetVal = String(cond.value ?? '');
+      const actualVal = String(depVal);
+      if (cond.operator === '!=') return actualVal !== targetVal;
+      return actualVal === targetVal;
+    });
+  };
+
+
 
   const { pages, isTerminated } = useMemo(() => {
     if (!schemaData) return { pages: [], isTerminated: false };
@@ -85,26 +176,8 @@ export function FormPreview({ schemaData, title }) {
 
     const filteredPages = p.filter((page, index) => {
       if (index === 0) return true;
-      if (page.logic && page.logic.fieldId) {
-        const depVal = formValues[page.logic.fieldId];
-        const targetVal = page.logic.value;
-        const op = page.logic.operator || '==';
-        const action = page.logic.action || 'show';
-        
-        let conditionMet = false;
-        // Handle undefined/null depVal gracefully
-        const val = depVal === undefined || depVal === null ? '' : depVal;
-
-        if (op === '==') conditionMet = (String(val) === String(targetVal));
-        if (op === '!=') conditionMet = (String(val) !== String(targetVal));
-        if (op === '<') conditionMet = (Number(val) < Number(targetVal));
-        if (op === '>') conditionMet = (Number(val) > Number(targetVal));
-        if (op === 'contains') conditionMet = (val && String(val).toLowerCase().includes(String(targetVal).toLowerCase()));
-        
-        if (conditionMet && action === 'hide') return false;
-        if (!conditionMet && action === 'show') return false;
-      }
-      return true;
+      const { isVisible } = evaluateLogic(page.logic, formValues);
+      return isVisible;
     });
 
     return { pages: filteredPages, isTerminated: terminated };
@@ -150,29 +223,9 @@ export function FormPreview({ schemaData, title }) {
           {currentFields.map(field => {
              let isRequired = field.required;
 
-              if (field.logic && field.logic.fieldId) {
-                 const depVal = formValues[field.logic.fieldId];
-                 const targetVal = field.logic.value;
-                 const op = field.logic.operator || '==';
-                 const action = field.logic.action || 'show';
-                 
-                 let conditionMet = false;
-                 // Handle undefined/null depVal gracefully
-                 const val = depVal === undefined || depVal === null ? '' : depVal;
-                 
-                 if (op === '==') conditionMet = (String(val) === String(targetVal));
-                 if (op === '!=') conditionMet = (String(val) !== String(targetVal));
-                 if (op === '<') conditionMet = (Number(val) < Number(targetVal));
-                 if (op === '>') conditionMet = (Number(val) > Number(targetVal));
-                 if (op === 'contains') conditionMet = (val && String(val).toLowerCase().includes(String(targetVal).toLowerCase()));
-                 
-                 if (conditionMet) {
-                    if (action === 'hide') return null;
-                    if (action === 'require') isRequired = true;
-                 } else {
-                    if (action === 'show') return null;
-                 }
-              }
+             const logicResult = evaluateLogic(field.logic, formValues);
+             if (!logicResult.isVisible) return null;
+             if (logicResult.isRequired) isRequired = true;
 
              let validationRules = { required: isRequired ? "This field is required" : false };
              if (field.validation) {
@@ -226,11 +279,38 @@ export function FormPreview({ schemaData, title }) {
                  
                  {field.type === 'text' && <input type="text" className="border border-gray-300 p-3 rounded-lg bg-white w-full" placeholder={field.placeholder || "Text input"} {...register(field.id, validationRules)} />}
                  {field.type === 'textarea' && <textarea className="border border-gray-300 p-3 rounded-lg bg-white w-full" rows="3" placeholder={field.placeholder || "Long text"} {...register(field.id, validationRules)} />}
-                 {field.type === 'number' && <input type="number" className="border border-gray-300 p-3 rounded-lg bg-white w-full" placeholder={field.placeholder || "0"} {...register(field.id, validationRules)} />}
+                 {field.type === 'number' && <input type="number" className="border border-gray-300 p-3 rounded-lg bg-white w-full" placeholder={field.placeholder || "0"} onWheel={(e) => e.target.blur()} {...register(field.id, validationRules)} />}
                  {field.type === 'email' && <input type="email" className="border border-gray-300 p-3 rounded-lg bg-white w-full" placeholder={field.placeholder || "email@example.com"} {...register(field.id, validationRules)} />}
                  {field.type === 'phone' && <input type="tel" className="border border-gray-300 p-3 rounded-lg bg-white w-full" placeholder={field.placeholder || "+1 234 567 8900"} {...register(field.id, validationRules)} />}
-                 {field.type === 'date' && <input type="date" className="border border-gray-300 p-3 rounded-lg bg-white w-full" {...register(field.id, validationRules)} />}
+                 {field.type === 'date' && (() => {
+                   const todayStr = new Date().toISOString().split('T')[0];
+                   const minAttr = field.validation?.minDate === 'today' ? todayStr : (field.validation?.minDate && field.validation?.minDate !== 'none' ? field.validation.minDate : undefined);
+                   const maxAttr = field.validation?.maxDate === 'today' ? todayStr : (field.validation?.maxDate && field.validation?.maxDate !== 'none' ? field.validation.maxDate : undefined);
+                   return (
+                     <input
+                       type="date"
+                       className="border border-gray-300 p-3 rounded-lg bg-white w-full"
+                       min={minAttr}
+                       max={maxAttr}
+                       {...register(field.id, {
+                         ...validationRules,
+                         ...(minAttr ? { min: { value: minAttr, message: `Date must be on or after ${minAttr === todayStr ? 'today' : minAttr}` } } : {}),
+                         ...(maxAttr ? { max: { value: maxAttr, message: `Date must be on or before ${maxAttr === todayStr ? 'today' : maxAttr}` } } : {}),
+                       })}
+                     />
+                   );
+                 })()}
                  {field.type === 'time' && <input type="time" className="border border-gray-300 p-3 rounded-lg bg-white w-full" {...register(field.id, validationRules)} />}
+                 {field.type === 'year' && (() => {
+                   const currentYear = new Date().getFullYear();
+                   const years = Array.from({ length: 120 }, (_, i) => currentYear - i);
+                   return (
+                     <select className="border border-gray-300 p-3 rounded-lg bg-white w-full" {...register(field.id, validationRules)}>
+                       <option value="">{field.placeholder || "Select Year..."}</option>
+                       {years.map(y => <option key={y} value={y}>{y}</option>)}
+                     </select>
+                   );
+                 })()}
                  {field.type === 'checkbox' && (
                    <label className="flex items-center gap-3">
                      <input type="checkbox" className="w-5 h-5 text-blue-600" {...register(field.id, validationRules)} />
@@ -240,7 +320,7 @@ export function FormPreview({ schemaData, title }) {
                  {field.type === 'dropdown' && (
                    <select className="border border-gray-300 p-3 rounded-lg bg-white w-full" {...register(field.id, validationRules)}>
                      <option value="">{field.placeholder || "Select..."}</option>
-                     {(field.options || []).map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
+                     {getVisibleOptions(field).map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
                    </select>
                  )}
                  {field.type === 'searchable_dropdown' && (
@@ -251,7 +331,7 @@ export function FormPreview({ schemaData, title }) {
                      render={({ field: { onChange, value, ref } }) => (
                        <Select
                          inputRef={ref}
-                         options={(field.options || []).map(opt => ({ label: opt, value: opt }))}
+                         options={getVisibleOptions(field).map(opt => ({ label: opt, value: opt }))}
                          value={value ? { label: value, value: value } : null}
                          onChange={val => onChange(val ? val.value : '')}
                          isClearable
@@ -263,7 +343,7 @@ export function FormPreview({ schemaData, title }) {
                  )}
                  {field.type === 'radio' && (
                    <div className="space-y-3">
-                     {(field.options || []).map((opt, i) => (
+                     {getVisibleOptions(field).map((opt, i) => (
                        <label key={i} className="flex items-center gap-3 bg-white p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-blue-300">
                          <input type="radio" value={opt} className="w-4 h-4 text-blue-600" {...register(field.id, validationRules)} />
                          {opt}
@@ -282,14 +362,47 @@ export function FormPreview({ schemaData, title }) {
                    </div>
                  )}
                  {field.type === 'multi_select' && (
-                   <div className="space-y-3">
-                     {(field.options || []).map((opt, i) => (
-                       <label key={i} className="flex items-center gap-3 bg-white p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-blue-300">
-                         <input type="checkbox" value={opt} className="w-4 h-4 text-blue-600" {...register(field.id, validationRules)} />
-                         {opt}
-                       </label>
-                     ))}
-                   </div>
+                   <Controller
+                     name={field.id}
+                     control={control}
+                     rules={validationRules}
+                     render={({ field: { onChange, value } }) => {
+                       const currentValues = Array.isArray(value) ? value : [];
+                       return (
+                         <div className="space-y-3">
+                           {getVisibleOptions(field).map((opt, i) => {
+                             const isNone = opt.toLowerCase() === 'none' || opt.toLowerCase() === 'none of the above' || opt.toLowerCase() === 'none of these';
+                             return (
+                               <label key={i} className="flex items-center gap-3 bg-white p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-blue-300">
+                                 <input
+                                   type="checkbox"
+                                   value={opt}
+                                   checked={currentValues.includes(opt)}
+                                   onChange={(e) => {
+                                     if (e.target.checked) {
+                                       if (isNone) {
+                                         onChange([opt]); // Selecting None clears everything else
+                                       } else {
+                                         // Selecting anything else clears None
+                                         onChange([...currentValues.filter(v => {
+                                           const l = v.toLowerCase();
+                                           return l !== 'none' && l !== 'none of the above' && l !== 'none of these';
+                                         }), opt]);
+                                       }
+                                     } else {
+                                       onChange(currentValues.filter(v => v !== opt));
+                                     }
+                                   }}
+                                   className="w-4 h-4 text-blue-600"
+                                 />
+                                 {opt}
+                               </label>
+                             );
+                           })}
+                         </div>
+                       );
+                     }}
+                   />
                  )}
                  {field.type === 'searchable_multi_select' && (
                    <Controller
@@ -300,9 +413,29 @@ export function FormPreview({ schemaData, title }) {
                        <Select
                          inputRef={ref}
                          isMulti
-                         options={(field.options || []).map(opt => ({ label: opt, value: opt }))}
+                         options={getVisibleOptions(field).map(opt => ({ label: opt, value: opt }))}
                          value={(value || []).map(v => ({ label: v, value: v }))}
-                         onChange={vals => onChange(vals ? vals.map(v => v.value) : [])}
+                         onChange={vals => {
+                           if (!vals || vals.length === 0) {
+                             onChange([]);
+                             return;
+                           }
+                           
+                           const lastAdded = vals[vals.length - 1].value;
+                           const isLastAddedNone = lastAdded.toLowerCase() === 'none' || lastAdded.toLowerCase() === 'none of the above' || lastAdded.toLowerCase() === 'none of these';
+                           
+                           if (isLastAddedNone) {
+                             onChange([lastAdded]);
+                           } else {
+                             onChange(vals
+                               .filter(v => {
+                                 const l = v.value.toLowerCase();
+                                 return l !== 'none' && l !== 'none of the above' && l !== 'none of these';
+                               })
+                               .map(v => v.value)
+                             );
+                           }
+                         }}
                          isClearable
                          placeholder={field.placeholder || "Select options..."}
                          styles={reactSelectAdminStyles}
@@ -357,8 +490,8 @@ export function FormPreview({ schemaData, title }) {
                  )}
                  
                  {field.type === 'qr_scanner' && (
-                   <Controller name={field.id} control={control} rules={validationRules} render={({ field: { onChange } }) => (
-                     <QRScannerComponent field={field} onChange={onChange} setValue={setValue} />
+                   <Controller name={field.id} control={control} rules={validationRules} render={({ field: { onChange, value } }) => (
+                     <QRScannerComponent field={field} value={value} onChange={onChange} setValue={setValue} />
                    )} />
                  )}
 

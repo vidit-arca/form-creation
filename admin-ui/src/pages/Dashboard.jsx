@@ -12,7 +12,7 @@ export function Dashboard() {
   useEffect(() => {
     fetch(`${API_URL}/admin/forms`)
       .then(res => res.json())
-      .then(data => { setForms(data); setLoading(false); })
+      .then(data => { setForms(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 

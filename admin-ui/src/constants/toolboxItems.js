@@ -6,6 +6,7 @@ export const TOOLBOX_ITEMS = [
   { type: 'phone', label: 'Phone Number', category: 'Basic Fields' },
   { type: 'date', label: 'Date Picker', category: 'Basic Fields' },
   { type: 'time', label: 'Time Picker', category: 'Basic Fields' },
+  { type: 'year', label: 'Year (YYYY)', category: 'Basic Fields' },
   { type: 'gender', label: 'Gender', category: 'Basic Fields' },
   { type: 'checkbox', label: 'Single Checkbox', category: 'Basic Fields' },
   { type: 'dropdown', label: 'Dropdown / Select', category: 'Choices' },

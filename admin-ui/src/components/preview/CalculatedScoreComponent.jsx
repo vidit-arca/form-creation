@@ -1,18 +1,41 @@
 import React, { useEffect, useState } from 'react';
 import { useWatch } from 'react-hook-form';
 
+const slugify = (text) => {
+  if (!text) return "";
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+};
+
 export function CalculatedScoreComponent({ field, control, schemaData, onChange }) {
   const [totalScore, setTotalScore] = useState(0);
   const [activeBadge, setActiveBadge] = useState(null);
 
-  // Watch all the fields that are part of this calculation
+  const isFormula = field.calculationMethod === 'formula';
+
+  const formulaDeps = React.useMemo(() => {
+    if (!isFormula || !field.formula) return [];
+    const matches = field.formula.match(/\[([^\]]+)\]/g);
+    if (!matches) return [];
+    
+    return matches.map(m => {
+      const varName = m.slice(1, -1).trim();
+      const sourceField = schemaData.find(f => (f.variableName || slugify(f.label) || f.id) === varName);
+      return sourceField ? sourceField.id : null;
+    }).filter(Boolean);
+  }, [isFormula, field.formula, schemaData]);
+
+  const fieldsToWatch = isFormula ? formulaDeps : (field.calculatedFields || []);
+
   const watchedValues = useWatch({
     control,
-    name: field.calculatedFields || []
+    name: fieldsToWatch
   });
 
   useEffect(() => {
-    if (!field.calculatedFields || field.calculatedFields.length === 0) {
+    if (!isFormula && (!field.calculatedFields || field.calculatedFields.length === 0)) {
       setTotalScore(0);
       setActiveBadge(null);
       return;
@@ -20,31 +43,69 @@ export function CalculatedScoreComponent({ field, control, schemaData, onChange 
 
     let sum = 0;
     
-    // watchedValues is an array corresponding to the watched fields
-    field.calculatedFields.forEach((fieldId, index) => {
-      const selectedValue = watchedValues[index];
-      if (selectedValue) {
-        // Find the schema field to look up the score mapping
-        const sourceField = schemaData.find(f => f.id === fieldId);
+    if (isFormula && field.formula) {
+      let jsExpr = field.formula;
+      let hasError = false;
+
+      jsExpr = jsExpr.replace(/\[([^\]]+)\]/g, (match, rawVarName) => {
+        const varName = rawVarName.trim();
+        const sourceField = schemaData.find(f => (f.variableName || slugify(f.label) || f.id) === varName);
+        if (!sourceField) return "(0)";
         
-        if (sourceField && sourceField.enableScoring && sourceField.optionScores) {
-          // If it's a multi-select, it might be an array
-          if (Array.isArray(selectedValue)) {
-            selectedValue.forEach(val => {
-              if (sourceField.optionScores[val] !== undefined) {
-                sum += Number(sourceField.optionScores[val]);
-              }
-            });
-          } else {
-            // Single choice (radio, dropdown)
-            if (sourceField.optionScores[selectedValue] !== undefined) {
-              sum += Number(sourceField.optionScores[selectedValue]);
-            }
+        const idx = fieldsToWatch.indexOf(sourceField.id);
+        const val = watchedValues[idx];
+        
+        let numericVal = Number(val) || 0;
+        
+        // If the field has scoring enabled, use the option score instead of literal value
+        if (sourceField && sourceField.enableScoring && sourceField.optionScores && val) {
+          if (Array.isArray(val)) {
+            numericVal = val.reduce((acc, v) => acc + (Number(sourceField.optionScores[v]) || 0), 0);
+          } else if (sourceField.optionScores[val] !== undefined) {
+            numericVal = Number(sourceField.optionScores[val]);
           }
         }
-      }
-    });
+        return `(${numericVal})`;
+      });
 
+      try {
+        const fn = new Function(`return ${jsExpr}`);
+        sum = Number(fn()) || 0;
+      } catch (e) {
+        sum = 0;
+      }
+    } else if (!isFormula) {
+      // watchedValues is an array corresponding to the watched fields
+      field.calculatedFields.forEach((fieldId, index) => {
+        const selectedValue = watchedValues[index];
+        if (selectedValue) {
+          // Find the schema field to look up the score mapping
+          const sourceField = schemaData.find(f => f.id === fieldId);
+          
+          if (sourceField && sourceField.enableScoring && sourceField.optionScores) {
+            // If it's a multi-select, it might be an array
+            if (Array.isArray(selectedValue)) {
+              selectedValue.forEach(val => {
+                if (sourceField.optionScores[val] !== undefined) {
+                  sum += Number(sourceField.optionScores[val]);
+                }
+              });
+            } else {
+              // Single choice (radio, dropdown)
+              if (sourceField.optionScores[selectedValue] !== undefined) {
+                sum += Number(sourceField.optionScores[selectedValue]);
+              }
+            }
+          } else if (selectedValue && !isNaN(Number(selectedValue))) {
+            // It's a standard number field or calculated score output
+            sum += Number(selectedValue);
+          }
+        }
+      });
+    }
+
+    // Round to 2 decimal places to avoid floating point weirdness
+    sum = Math.round(sum * 100) / 100;
     setTotalScore(sum);
 
     // Determine the badge based on thresholds
@@ -57,7 +118,48 @@ export function CalculatedScoreComponent({ field, control, schemaData, onChange 
 
     // Update the form state with the result
     if (onChange) {
-      onChange({ score: sum, label: badge ? badge.label : '' });
+      const breakdown = {};
+      fieldsToWatch.forEach((fieldId, index) => {
+        const sourceField = schemaData.find(f => f.id === fieldId);
+        if (!sourceField) return;
+
+        const val = watchedValues[index];
+        let points = 0;
+
+        if (val && sourceField.enableScoring && sourceField.optionScores) {
+          if (Array.isArray(val)) {
+            val.forEach(v => {
+              if (sourceField.optionScores[v] !== undefined) points += Number(sourceField.optionScores[v]);
+            });
+          } else {
+            if (sourceField.optionScores[val] !== undefined) points += Number(sourceField.optionScores[val]);
+          }
+        } else if (val && !isNaN(Number(val))) {
+          points = Number(val);
+        }
+
+        // Generate a unique key - handle duplicate labels by appending a suffix
+        let baseKey = sourceField.variableName || slugify(sourceField.label) || fieldId;
+        let key = baseKey;
+        let counter = 2;
+        while (breakdown.hasOwnProperty(key)) {
+          key = `${baseKey}_${counter}`;
+          counter++;
+        }
+
+        breakdown[key] = {
+          question: sourceField.label,
+          answer: val || null,
+          points: points
+        };
+      });
+
+      onChange({ 
+        score: sum, 
+        label: badge ? badge.label : '',
+        breakdown: breakdown,
+        total_items: field.calculatedFields.length
+      });
     }
   }, [watchedValues, field, schemaData, onChange]);
 

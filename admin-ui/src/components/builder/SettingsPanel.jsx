@@ -48,7 +48,7 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
               {activeField.type !== 'divider' && (
                 <div>
                   <label className="text-sm font-bold text-gray-700 block mb-2">{activeField.type === 'page_break' ? 'Section Title' : 'Text / Heading'}</label>
-                  <input 
+                  <input
                     className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={activeField.label}
                     onChange={(e) => updateField(activeField.id, { label: e.target.value })}
@@ -58,7 +58,7 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
               {activeField.type === 'page_break' && (
                 <div className="mt-4">
                   <label className="text-sm font-bold text-gray-700 block mb-2">Section Description</label>
-                  <textarea 
+                  <textarea
                     className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={activeField.description || ''}
                     onChange={(e) => updateField(activeField.id, { description: e.target.value })}
@@ -69,7 +69,7 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
               {activeField.type === 'instruction' && (
                 <div className="mt-4">
                   <label className="text-sm font-bold text-gray-700 block mb-2">Instruction Body</label>
-                  <textarea 
+                  <textarea
                     className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={activeField.description || ''}
                     onChange={(e) => updateField(activeField.id, { description: e.target.value })}
@@ -82,18 +82,18 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
             <>
               <div>
                 <label className="text-sm font-bold text-gray-700 block mb-2">Label / Question</label>
-                <input 
+                <input
                   className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   value={activeField.label}
                   onChange={(e) => {
                     const newLabel = e.target.value;
                     const updates = { label: newLabel };
-                    
+
                     // Auto-slug if not manual
                     if (!isManualVariable && !activeField.variableNameSetExplicitly) {
                       updates.variableName = slugify(newLabel);
                     }
-                    
+
                     updateField(activeField.id, updates);
                   }}
                 />
@@ -102,12 +102,12 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
               <div className="mt-4">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Database Variable Name (Slug)</label>
                 <div className="relative">
-                  <input 
+                  <input
                     className="w-full border border-gray-300 p-2.5 pl-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-xs bg-gray-50"
                     value={activeField.variableName || slugify(activeField.label || '')}
                     onChange={(e) => {
                       setIsManualVariable(true);
-                      updateField(activeField.id, { 
+                      updateField(activeField.id, {
                         variableName: slugify(e.target.value),
                         variableNameSetExplicitly: true
                       });
@@ -122,7 +122,7 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
 
               <div className="mt-4">
                 <label className="text-sm font-bold text-gray-700 block mb-2">Placeholder Text</label>
-                <input 
+                <input
                   className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   value={activeField.placeholder || ''}
                   onChange={(e) => updateField(activeField.id, { placeholder: e.target.value })}
@@ -131,17 +131,17 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
 
               <div className="mt-4">
                 <label className="text-sm font-bold text-gray-700 block mb-2">Help Text</label>
-                <input 
+                <input
                   className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   value={activeField.helpText || ''}
                   onChange={(e) => updateField(activeField.id, { helpText: e.target.value })}
                 />
               </div>
-              
+
               <div className="mt-4">
                 <label className="flex items-center gap-3 cursor-pointer bg-gray-50 p-3 rounded-lg border border-gray-200 hover:border-gray-300">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="w-4 h-4 text-blue-600 rounded"
                     checked={activeField.required}
                     onChange={(e) => updateField(activeField.id, { required: e.target.checked })}
@@ -188,11 +188,112 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                     <input type="number" className="w-full border border-gray-300 p-2 rounded-lg" value={activeField.validation?.maxWords || ''} onChange={(e) => updateField(activeField.id, { validation: { ...activeField.validation, maxWords: e.target.value } })} />
                   </div>
                 )}
+
+                {/* ── Date Validation ─────────────────────────────────── */}
+                {['date'].includes(activeField.type) && (
+                  <div className="space-y-3">
+                    {/* Min Date */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">Earliest Allowed Date</label>
+                      <select
+                        className="w-full border border-gray-300 p-2 rounded-lg text-sm mb-1"
+                        value={activeField.validation?.minDatePreset || 'none'}
+                        onChange={(e) => {
+                          const preset = e.target.value;
+                          updateField(activeField.id, {
+                            validation: { ...activeField.validation, minDatePreset: preset, minDate: preset === 'custom' ? (activeField.validation?.minDate || '') : preset }
+                          });
+                        }}
+                      >
+                        <option value="none">No Limit</option>
+                        <option value="today">Today (dynamic — blocks past dates)</option>
+                        <option value="custom">Custom Date</option>
+                      </select>
+                      {activeField.validation?.minDatePreset === 'custom' && (
+                        <input
+                          type="date"
+                          className="w-full border border-blue-300 p-2 rounded-lg text-sm bg-blue-50"
+                          value={activeField.validation?.minDate || ''}
+                          onChange={(e) => updateField(activeField.id, { validation: { ...activeField.validation, minDate: e.target.value } })}
+                        />
+                      )}
+                      {activeField.validation?.minDatePreset === 'today' && (
+                        <p className="text-xs text-blue-600 mt-1">📅 Patient cannot select a past date — minimum is always today's date.</p>
+                      )}
+                    </div>
+
+                    {/* Max Date */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">Latest Allowed Date</label>
+                      <select
+                        className="w-full border border-gray-300 p-2 rounded-lg text-sm mb-1"
+                        value={activeField.validation?.maxDatePreset || 'none'}
+                        onChange={(e) => {
+                          const preset = e.target.value;
+                          updateField(activeField.id, {
+                            validation: { ...activeField.validation, maxDatePreset: preset, maxDate: preset === 'custom' ? (activeField.validation?.maxDate || '') : preset }
+                          });
+                        }}
+                      >
+                        <option value="none">No Limit</option>
+                        <option value="today">Today (dynamic — blocks future dates)</option>
+                        <option value="custom">Custom Date</option>
+                      </select>
+                      {activeField.validation?.maxDatePreset === 'custom' && (
+                        <input
+                          type="date"
+                          className="w-full border border-blue-300 p-2 rounded-lg text-sm bg-blue-50"
+                          value={activeField.validation?.maxDate || ''}
+                          onChange={(e) => updateField(activeField.id, { validation: { ...activeField.validation, maxDate: e.target.value } })}
+                        />
+                      )}
+                      {activeField.validation?.maxDatePreset === 'today' && (
+                        <p className="text-xs text-orange-600 mt-1">📅 Patient cannot select a future date — maximum is always today's date.</p>
+                      )}
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Quick Presets</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded-md bg-orange-100 text-orange-700 border border-orange-200 hover:bg-orange-200 transition"
+                          onClick={() => updateField(activeField.id, { validation: { ...activeField.validation, minDatePreset: 'none', minDate: '', maxDatePreset: 'today', maxDate: 'today' } })}
+                        >
+                          📅 Past Only (e.g. Date of Birth)
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded-md bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200 transition"
+                          onClick={() => updateField(activeField.id, { validation: { ...activeField.validation, minDatePreset: 'today', minDate: 'today', maxDatePreset: 'none', maxDate: '' } })}
+                        >
+                          📅 Future Only (e.g. Follow-up Date)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Year-only (number field) Validation ─────────────── */}
+                {activeField.type === 'number' && activeField.label?.toLowerCase().includes('year') && (
+                  <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 mt-2">
+                    <p className="text-xs font-bold text-amber-700 mb-1">💡 Year Field Tip</p>
+                    <p className="text-xs text-amber-600 mb-2">Set Min/Max above to restrict the year range. For "must not exceed current year", set Max Value to the current year.</p>
+                    <button
+                      type="button"
+                      className="text-xs px-2 py-1 rounded-md bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 transition"
+                      onClick={() => updateField(activeField.id, { validation: { ...activeField.validation, max: new Date().getFullYear() } })}
+                    >
+                      Set Max = {new Date().getFullYear()} (Current Year)
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
 
-          {['dropdown', 'radio', 'multi_select', 'gender', 'checkbox'].includes(activeField.type) && (
+          {['dropdown', 'radio', 'multi_select', 'gender', 'checkbox', 'searchable_dropdown', 'searchable_multi_select'].includes(activeField.type) && (
             <div className="border-t border-gray-100 pt-6">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-bold text-gray-700 block">Options (Choices)</label>
@@ -204,57 +305,167 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                 )}
               </div>
               <div className="space-y-2 mb-3">
-                {(activeField.options || []).map((opt, i) => (
-                  <div key={i} className="flex gap-2 items-center">
-                    <input 
-                      className="flex-1 border border-gray-300 p-2 rounded-lg text-sm"
-                      value={opt}
-                      onChange={(e) => {
-                        const newVal = e.target.value;
-                        const newOptions = [...activeField.options];
-                        newOptions[i] = newVal;
-                        
-                        // If scoring enabled, migrate the score to the new key
-                        let newOptionScores = { ...(activeField.optionScores || {}) };
-                        if (activeField.enableScoring && newOptionScores[opt] !== undefined) {
-                          newOptionScores[newVal] = newOptionScores[opt];
-                          delete newOptionScores[opt];
-                        }
-                        
-                        updateField(activeField.id, { options: newOptions, optionScores: newOptionScores });
-                      }}
-                    />
-                    {activeField.enableScoring && (
-                      <input 
-                        type="number"
-                        className="w-20 border border-gray-300 p-2 rounded-lg text-sm bg-blue-50 border-blue-200 focus:ring-blue-500 outline-none"
-                        placeholder="Score"
-                        value={activeField.optionScores?.[opt] ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? '' : Number(e.target.value);
-                          updateField(activeField.id, { 
-                            optionScores: { ...(activeField.optionScores || {}), [opt]: val } 
-                          });
-                        }}
-                      />
-                    )}
-                    <button 
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200"
-                      onClick={() => {
-                        const newOptions = activeField.options.filter((_, idx) => idx !== i);
-                        const newOptionScores = { ...(activeField.optionScores || {}) };
-                        delete newOptionScores[opt];
-                        updateField(activeField.id, { options: newOptions, optionScores: newOptionScores });
-                      }}
-                    >X</button>
-                  </div>
-                ))}
+                {(activeField.options || []).map((opt, i) => {
+                  const hasCondition = !!(activeField.optionConditions?.[opt]?.fieldId);
+                  const conditionKey = `optCondOpen_${i}`;
+                  const isOpen = activeField._openOptCond === opt;
+                  const allFields = Array.isArray(schemaData) ? schemaData : [];
+                  const sourceField = allFields.find(f => f.id === activeField.optionConditions?.[opt]?.fieldId);
+
+                  return (
+                    <div key={i} className="border border-gray-200 rounded-lg overflow-hidden">
+                      {/* Option row */}
+                      <div className="flex gap-2 items-center p-2 bg-white">
+                        <input
+                          className="flex-1 border border-gray-300 p-2 rounded-lg text-sm"
+                          value={opt}
+                          onChange={(e) => {
+                            const newVal = e.target.value;
+                            const newOptions = [...activeField.options];
+                            newOptions[i] = newVal;
+                            let newOptionScores = { ...(activeField.optionScores || {}) };
+                            let newOptionConditions = { ...(activeField.optionConditions || {}) };
+                            if (activeField.enableScoring && newOptionScores[opt] !== undefined) {
+                              newOptionScores[newVal] = newOptionScores[opt];
+                              delete newOptionScores[opt];
+                            }
+                            if (newOptionConditions[opt]) {
+                              newOptionConditions[newVal] = newOptionConditions[opt];
+                              delete newOptionConditions[opt];
+                            }
+                            updateField(activeField.id, { options: newOptions, optionScores: newOptionScores, optionConditions: newOptionConditions });
+                          }}
+                        />
+                        {activeField.enableScoring && (
+                          <input
+                            type="number"
+                            className="w-16 border border-gray-300 p-2 rounded-lg text-sm bg-blue-50 border-blue-200 focus:ring-blue-500 outline-none"
+                            placeholder="Score"
+                            value={activeField.optionScores?.[opt] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : Number(e.target.value);
+                              updateField(activeField.id, { optionScores: { ...(activeField.optionScores || {}), [opt]: val } });
+                            }}
+                          />
+                        )}
+                        {/* Condition toggle button */}
+                        <button
+                          type="button"
+                          title={hasCondition ? `Condition: show when ${sourceField?.label || '?'} ${activeField.optionConditions?.[opt]?.operator} ${activeField.optionConditions?.[opt]?.value}` : 'Add show/hide condition for this option'}
+                          className={`p-1.5 rounded-lg border text-xs transition ${hasCondition ? 'bg-purple-100 border-purple-300 text-purple-700' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-purple-600 hover:border-purple-300'}`}
+                          onClick={() => updateField(activeField.id, { _openOptCond: isOpen ? null : opt })}
+                        >
+                          🔗
+                        </button>
+                        <button
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200 text-xs"
+                          onClick={() => {
+                            const newOptions = activeField.options.filter((_, idx) => idx !== i);
+                            const newOptionScores = { ...(activeField.optionScores || {}) };
+                            const newOptionConditions = { ...(activeField.optionConditions || {}) };
+                            delete newOptionScores[opt];
+                            delete newOptionConditions[opt];
+                            updateField(activeField.id, { options: newOptions, optionScores: newOptionScores, optionConditions: newOptionConditions });
+                          }}
+                        >✕</button>
+                      </div>
+
+                      {/* Inline condition editor */}
+                      {isOpen && (
+                        <div className="bg-purple-50 border-t border-purple-200 p-3 space-y-2">
+                          <p className="text-xs font-bold text-purple-700 mb-1">Show "<span className="italic">{opt}</span>" only when:</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {/* Source field picker */}
+                            <select
+                              className="flex-1 min-w-0 border border-purple-200 p-1.5 rounded-md text-xs bg-white"
+                              value={activeField.optionConditions?.[opt]?.fieldId || ''}
+                              onChange={(e) => {
+                                updateField(activeField.id, {
+                                  optionConditions: {
+                                    ...(activeField.optionConditions || {}),
+                                    [opt]: { ...(activeField.optionConditions?.[opt] || { operator: '==', value: '' }), fieldId: e.target.value }
+                                  }
+                                });
+                              }}
+                            >
+                              <option value="">— Pick a field —</option>
+                              {allFields.filter(f => f.id !== activeField.id && ['dropdown','radio','gender','searchable_dropdown','text','number'].includes(f.type)).map(f => (
+                                <option key={f.id} value={f.id}>{f.label || f.id}</option>
+                              ))}
+                            </select>
+                            {/* Operator */}
+                            <select
+                              className="w-20 border border-purple-200 p-1.5 rounded-md text-xs bg-white"
+                              value={activeField.optionConditions?.[opt]?.operator || '=='}
+                              onChange={(e) => {
+                                updateField(activeField.id, {
+                                  optionConditions: {
+                                    ...(activeField.optionConditions || {}),
+                                    [opt]: { ...(activeField.optionConditions?.[opt] || { fieldId: '', value: '' }), operator: e.target.value }
+                                  }
+                                });
+                              }}
+                            >
+                              <option value="==">= equals</option>
+                              <option value="!=">≠ not equals</option>
+                            </select>
+                            {/* Expected value */}
+                            {(sourceField?.options?.length > 0 || sourceField?.type === 'gender') ? (
+                              <select
+                                className="flex-1 min-w-0 border border-purple-200 p-1.5 rounded-md text-xs bg-white"
+                                value={activeField.optionConditions?.[opt]?.value || ''}
+                                onChange={(e) => {
+                                  updateField(activeField.id, {
+                                    optionConditions: {
+                                      ...(activeField.optionConditions || {}),
+                                      [opt]: { ...(activeField.optionConditions?.[opt] || { fieldId: '', operator: '==' }), value: e.target.value }
+                                    }
+                                  });
+                                }}
+                              >
+                                <option value="">— Pick value —</option>
+                                {(sourceField.options?.length > 0 ? sourceField.options : (sourceField.type === 'gender' ? ['Male','Female','Other','Prefer not to say'] : [])).map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                placeholder="value"
+                                className="flex-1 min-w-0 border border-purple-200 p-1.5 rounded-md text-xs bg-white"
+                                value={activeField.optionConditions?.[opt]?.value || ''}
+                                onChange={(e) => {
+                                  updateField(activeField.id, {
+                                    optionConditions: {
+                                      ...(activeField.optionConditions || {}),
+                                      [opt]: { ...(activeField.optionConditions?.[opt] || { fieldId: '', operator: '==' }), value: e.target.value }
+                                    }
+                                  });
+                                }}
+                              />
+                            )}
+                          </div>
+                          {/* Clear condition */}
+                          {hasCondition && (
+                            <button
+                              type="button"
+                              className="text-xs text-red-500 hover:underline"
+                              onClick={() => {
+                                const newConds = { ...(activeField.optionConditions || {}) };
+                                delete newConds[opt];
+                                updateField(activeField.id, { optionConditions: newConds, _openOptCond: null });
+                              }}
+                            >✕ Remove condition</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <button 
+              <button
                 className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
                 onClick={() => {
                   const newOptName = `Option ${(activeField.options?.length || 0) + 1}`;
-                  updateField(activeField.id, { 
+                  updateField(activeField.id, {
                     options: [...(activeField.options || []), newOptName],
                     optionScores: { ...(activeField.optionScores || {}), [newOptName]: 0 }
                   });
@@ -276,7 +487,7 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                       <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-500"></div>
                     </label>
                   </div>
-                  
+
                   {activeField.enableExclusiveStop && (
                     <div className="space-y-2 mt-3">
                       <p className="text-xs text-red-600/80 mb-2 leading-relaxed">Select options that will immediately terminate the form. All subsequent questions and sections will be skipped.</p>
@@ -284,8 +495,8 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                         const isStop = activeField.exclusiveStopOptions?.includes(opt);
                         return (
                           <label key={i} className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors ${isStop ? 'bg-red-100 border-red-300 text-red-900' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                            <input 
-                              type="checkbox" 
+                            <input
+                              type="checkbox"
                               className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                               checked={isStop}
                               onChange={(e) => {
@@ -309,14 +520,14 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
               )}
             </div>
           )}
-          
+
           {activeField.type === 'rating' && (
             <div className="border-t border-gray-100 pt-6">
               <label className="text-sm font-bold text-gray-700 block mb-2">Max Stars</label>
               <input type="number" className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value={activeField.ratingMax || 5} onChange={(e) => updateField(activeField.id, { ratingMax: parseInt(e.target.value) })} />
             </div>
           )}
-          
+
           {activeField.type === 'scale' && (
             <div className="border-t border-gray-100 pt-6 space-y-4">
               <div className="flex gap-2">
@@ -349,11 +560,11 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                 QR Data Mapping (JSON)
               </h3>
               <p className="text-xs text-gray-500 mb-2">Map keys from the scanned JSON to form fields.</p>
-              
+
               <div className="space-y-2 mb-3">
                 {(activeField.qrMappings || []).map((mapping, i) => (
                   <div key={i} className="flex gap-2 items-center bg-gray-50 p-2 rounded border border-gray-200">
-                    <input 
+                    <input
                       className="flex-1 border border-gray-300 p-2 rounded text-sm bg-white"
                       placeholder="JSON Key (e.g. name)"
                       value={mapping.qrKey || ''}
@@ -378,7 +589,7 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                         <option key={f.id} value={f.id}>{f.label || f.id}</option>
                       ))}
                     </select>
-                    <button 
+                    <button
                       className="p-1.5 text-red-500 hover:bg-red-100 rounded"
                       onClick={() => {
                         const newMappings = (activeField.qrMappings || []).filter((_, idx) => idx !== i);
@@ -390,7 +601,7 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                   </div>
                 ))}
               </div>
-              <button 
+              <button
                 className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
                 onClick={() => updateField(activeField.id, { qrMappings: [...(activeField.qrMappings || []), { qrKey: '', fieldId: '' }] })}
               >
@@ -404,7 +615,7 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
               <h3 className="text-sm font-bold text-gray-700 mb-3">BMI Settings</h3>
               <div>
                 <label className="text-sm font-bold text-gray-700 block mb-2">Measurement Unit</label>
-                <select 
+                <select
                   className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   value={activeField.bmiUnit || 'metric'}
                   onChange={(e) => updateField(activeField.id, { bmiUnit: e.target.value })}
@@ -419,29 +630,79 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
           {activeField.type === 'calculated_score' && (
             <div className="border-t border-gray-100 pt-6 space-y-6">
               <div>
-                <h3 className="text-sm font-bold text-gray-700 mb-2">Fields to Sum</h3>
-                <p className="text-xs text-gray-500 mb-3">Select the scored fields you want to calculate.</p>
-                <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
-                  {schemaData.filter(f => f.id !== activeField.id && ['dropdown', 'radio', 'multi_select', 'checkbox'].includes(f.type) && f.enableScoring).length === 0 && (
-                    <div className="text-xs text-gray-400 p-2 text-center">No fields have "Enable Scoring" turned on.</div>
-                  )}
-                  {schemaData.filter(f => f.id !== activeField.id && ['dropdown', 'radio', 'multi_select', 'checkbox'].includes(f.type) && f.enableScoring).map(f => (
-                    <label key={f.id} className="flex items-center gap-2 text-sm bg-white p-2 rounded border border-gray-100 cursor-pointer hover:border-blue-300">
-                      <input 
-                        type="checkbox" 
-                        className="rounded text-blue-600 focus:ring-blue-500"
-                        checked={(activeField.calculatedFields || []).includes(f.id)}
-                        onChange={(e) => {
-                          let newFields = [...(activeField.calculatedFields || [])];
-                          if (e.target.checked) newFields.push(f.id);
-                          else newFields = newFields.filter(id => id !== f.id);
-                          updateField(activeField.id, { calculatedFields: newFields });
-                        }}
-                      />
-                      <span className="font-medium text-gray-700 truncate">{f.label || f.id}</span>
-                    </label>
-                  ))}
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-gray-700">Calculation Method</h3>
+                  <div className="flex bg-gray-100 rounded-lg p-1">
+                    <button
+                      className={`text-xs px-3 py-1.5 rounded-md font-medium transition ${!activeField.calculationMethod || activeField.calculationMethod === 'sum' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => updateField(activeField.id, { calculationMethod: 'sum' })}
+                    >
+                      Sum of Fields
+                    </button>
+                    <button
+                      className={`text-xs px-3 py-1.5 rounded-md font-medium transition ${activeField.calculationMethod === 'formula' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => updateField(activeField.id, { calculationMethod: 'formula' })}
+                    >
+                      Custom Formula
+                    </button>
+                  </div>
                 </div>
+
+                {(!activeField.calculationMethod || activeField.calculationMethod === 'sum') ? (
+                  <>
+                    <p className="text-xs text-gray-500 mb-3">Select the scored fields you want to calculate.</p>
+                    <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
+                      {schemaData.filter(f => f.id !== activeField.id && ['dropdown', 'radio', 'multi_select', 'checkbox', 'searchable_dropdown', 'searchable_multi_select'].includes(f.type) && f.enableScoring).length === 0 && (
+                        <div className="text-xs text-gray-400 p-2 text-center">No fields have "Enable Scoring" turned on.</div>
+                      )}
+                      {schemaData.filter(f => f.id !== activeField.id && ['dropdown', 'radio', 'multi_select', 'checkbox', 'searchable_dropdown', 'searchable_multi_select'].includes(f.type) && f.enableScoring).map(f => (
+                        <label key={f.id} className="flex items-center gap-2 text-sm bg-white p-2 rounded border border-gray-100 cursor-pointer hover:border-blue-300">
+                          <input
+                            type="checkbox"
+                            className="rounded text-blue-600 focus:ring-blue-500"
+                            checked={(activeField.calculatedFields || []).includes(f.id)}
+                            onChange={(e) => {
+                              let newFields = [...(activeField.calculatedFields || [])];
+                              if (e.target.checked) newFields.push(f.id);
+                              else newFields = newFields.filter(id => id !== f.id);
+                              updateField(activeField.id, { calculatedFields: newFields });
+                            }}
+                          />
+                          <span className="font-medium text-gray-700 truncate">{f.label || f.id}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3">
+                    <p className="text-xs text-gray-600 mb-2">Write mathematical formulas using field IDs wrapped in brackets. Example: <code className="bg-white px-1 py-0.5 rounded border">([smoking_per_day] * 365) / [age]</code></p>
+                    <textarea
+                      className="w-full border border-gray-300 p-3 rounded-lg text-sm font-mono bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      rows="3"
+                      placeholder="e.g. [smoking_per_day] * [smoking_duration]"
+                      value={activeField.formula || ''}
+                      onChange={(e) => updateField(activeField.id, { formula: e.target.value })}
+                    />
+                    <div className="mt-3">
+                      <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Available Variables</p>
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                        {schemaData.filter(f => f.id !== activeField.id && !['page_break', 'section_header', 'instruction', 'divider', 'file', 'image', 'signature', 'gps'].includes(f.type)).map(f => {
+                          const varName = f.variableName || slugify(f.label) || f.id;
+                          return (
+                            <button
+                              key={f.id}
+                              title={f.label || f.id}
+                              className="text-[10px] bg-white border border-gray-200 px-2 py-1 rounded hover:bg-blue-50 hover:border-blue-300 transition text-gray-600 truncate max-w-[150px]"
+                              onClick={() => updateField(activeField.id, { formula: (activeField.formula || '') + `[${varName}]` })}
+                            >
+                              [{varName}]
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -488,7 +749,7 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                     </div>
                   ))}
                 </div>
-                <button 
+                <button
                   className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
                   onClick={() => updateField(activeField.id, { scoreThresholds: [...(activeField.scoreThresholds || []), { min: 0, max: 10, label: 'New Badge', color: 'gray' }] })}
                 >
@@ -501,11 +762,11 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
           {activeField.type === 'cohort_input' && (
             <div className="border-t border-gray-100 pt-6 space-y-5">
               <h3 className="text-sm font-bold text-gray-700 mb-2">Cohort Validation Rules</h3>
-              
+
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600 block mb-1">Target Age Field</label>
-                  <select 
+                  <select
                     className="w-full border border-gray-300 p-2 rounded bg-white text-sm"
                     value={activeField.ageFieldId || ''}
                     onChange={(e) => updateField(activeField.id, { ageFieldId: e.target.value })}
@@ -516,10 +777,10 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                     ))}
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="text-xs font-medium text-gray-600 block mb-1">Target Gender Field</label>
-                  <select 
+                  <select
                     className="w-full border border-gray-300 p-2 rounded bg-white text-sm"
                     value={activeField.genderFieldId || ''}
                     onChange={(e) => updateField(activeField.id, { genderFieldId: e.target.value })}
@@ -579,10 +840,10 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                     <div className="text-xs text-gray-400 italic text-center p-2">No rules added yet.</div>
                   )}
                 </div>
-                <button 
+                <button
                   className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
-                  onClick={() => updateField(activeField.id, { 
-                    cohortRules: [...(activeField.cohortRules || []), { minAge: '', maxAge: '', genderValue: '', prefix: '' }] 
+                  onClick={() => updateField(activeField.id, {
+                    cohortRules: [...(activeField.cohortRules || []), { minAge: '', maxAge: '', genderValue: '', prefix: '' }]
                   })}
                 >
                   + Add Rule
@@ -592,97 +853,189 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
           )}
 
           {/* LOGIC SECTION */}
-          <div className="border-t border-gray-100 pt-6">
-            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-              <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              Conditional Logic
-            </h3>
+          {(() => {
+            const logic = activeField.logic || { action: 'show', joinType: 'AND', rules: [] };
             
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 space-y-3">
-              <div className="flex gap-2 mb-2 items-center">
-                <select
-                  className="flex-1 p-2 border border-purple-200 rounded text-sm bg-white font-medium text-purple-700"
-                  value={activeField.logic?.action || 'show'}
-                  onChange={(e) => {
-                    const currentLogic = activeField.logic || { fieldId: '', operator: '==', value: '', action: 'show' };
-                    updateField(activeField.id, { logic: { ...currentLogic, action: e.target.value } });
-                  }}
-                >
-                  <option value="show">Show this field</option>
-                  <option value="hide">Hide this field</option>
-                  <option value="require">Require this field</option>
-                </select>
-                <span className="text-sm text-purple-600 font-medium">ONLY IF:</span>
-              </div>
+            // Normalize logic format to support backward compatibility
+            let normalizedLogic = {
+              action: logic.action || 'show',
+              joinType: logic.joinType || 'AND',
+              rules: logic.rules || []
+            };
+            
+            if (logic.fieldId) {
+              normalizedLogic.rules = [{
+                fieldId: logic.fieldId,
+                operator: logic.operator || '==',
+                value: logic.value || ''
+              }];
+            }
 
-              <select 
-                className="w-full p-2 border border-purple-200 rounded text-sm bg-white"
-                value={activeField.logic?.fieldId || ''}
-                onChange={(e) => {
-                  const currentLogic = activeField.logic || { fieldId: '', operator: '==', value: '', action: 'show' };
-                  updateField(activeField.id, { logic: { ...currentLogic, fieldId: e.target.value } });
-                }}
-              >
-                <option value="">-- No Rule / Always Active --</option>
-                {schemaData.filter(f => f.id !== activeField.id && f.type !== 'page_break').map(f => (
-                  <option key={f.id} value={f.id}>{f.label || f.id} ({f.type})</option>
-                ))}
-              </select>
+            return (
+              <div className="border-t border-gray-100 pt-6">
+                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  Conditional Logic
+                </h3>
 
-              {activeField.logic?.fieldId && (
-                <div className="space-y-3">
-                  <select 
-                    className="w-full p-2 border border-purple-200 rounded text-sm bg-white"
-                    value={activeField.logic?.operator || '=='}
-                    onChange={(e) => {
-                      const currentLogic = activeField.logic || { fieldId: '', operator: '==', value: '', action: 'show' };
-                      updateField(activeField.id, { logic: { ...currentLogic, operator: e.target.value } });
-                    }}
-                  >
-                    <option value="==">Equals</option>
-                    <option value="!=">Not Equals</option>
-                    <option value="contains">Contains</option>
-                    <option value="<">Less Than</option>
-                    <option value=">">Greater Than</option>
-                  </select>
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-purple-750 block mb-1.5 uppercase tracking-wider">Logic Action</label>
+                    <select
+                      className="w-full p-2 border border-purple-200 rounded text-sm bg-white font-semibold text-purple-750"
+                      value={normalizedLogic.action}
+                      onChange={(e) => {
+                        const updated = { ...normalizedLogic, action: e.target.value };
+                        updateField(activeField.id, { logic: updated });
+                      }}
+                    >
+                      <option value="show">Show this field</option>
+                      <option value="hide">Hide this field</option>
+                      <option value="require">Require this field</option>
+                    </select>
+                  </div>
 
-                  {(() => {
-                    const sourceField = schemaData.find(f => f.id === activeField.logic.fieldId);
-                    const hasOptions = sourceField && ['dropdown', 'radio', 'multi_select', 'gender'].includes(sourceField.type);
-                    
-                    if (hasOptions) {
-                      const opts = sourceField.type === 'gender' ? (sourceField.options || ['Male', 'Female', 'Other', 'Prefer not to say']) : (sourceField.options || []);
-                      return (
-                        <select
-                          className="w-full p-2 border border-purple-200 rounded text-sm bg-white"
-                          value={activeField.logic?.value || ''}
-                          onChange={(e) => updateField(activeField.id, { logic: { ...activeField.logic, value: e.target.value } })}
+                  {normalizedLogic.rules.length > 1 && (
+                    <div className="flex items-center justify-between text-xs font-bold text-purple-800 bg-purple-100/50 p-2.5 rounded border border-purple-200/50">
+                      <span>Match Conditions:</span>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...normalizedLogic, joinType: 'AND' };
+                            updateField(activeField.id, { logic: updated });
+                          }}
+                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold transition-all cursor-pointer ${normalizedLogic.joinType === 'AND' ? 'bg-purple-650 text-white shadow-sm' : 'bg-transparent text-purple-700 hover:bg-purple-200/60'}`}
                         >
-                          <option value="">Select Value...</option>
-                          {opts.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
-                        </select>
-                      );
-                    }
+                          ALL (AND)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...normalizedLogic, joinType: 'OR' };
+                            updateField(activeField.id, { logic: updated });
+                          }}
+                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold transition-all cursor-pointer ${normalizedLogic.joinType === 'OR' ? 'bg-purple-650 text-white shadow-sm' : 'bg-transparent text-purple-700 hover:bg-purple-200/60'}`}
+                        >
+                          ANY (OR)
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-                    return (
-                      <input 
-                        className="w-full p-2 border border-purple-200 rounded text-sm bg-white"
-                        placeholder="Type value..."
-                        value={activeField.logic?.value || ''}
-                        onChange={(e) => {
-                          const currentLogic = activeField.logic || { fieldId: '', operator: '==', value: '', action: 'show' };
-                          updateField(activeField.id, { logic: { ...currentLogic, value: e.target.value } });
-                        }}
-                      />
-                    );
-                  })()}
+                  <div className="space-y-3">
+                    {normalizedLogic.rules.map((rule, idx) => {
+                      const sourceField = schemaData.find(f => f.id === rule.fieldId);
+                      const hasOptions = sourceField && ['dropdown', 'radio', 'multi_select', 'gender', 'searchable_dropdown', 'searchable_multi_select'].includes(sourceField.type);
+                      const opts = sourceField ? (sourceField.type === 'gender' ? ['Male', 'Female', 'Other', 'Prefer not to say'] : (sourceField.options || [])) : [];
+
+                      return (
+                        <div key={idx} className="bg-white p-3 rounded-lg border border-purple-200/60 shadow-sm space-y-2 relative">
+                          <div className="flex justify-between items-center text-[10px] font-extrabold text-purple-500 uppercase tracking-wider">
+                            <span>Condition #{idx + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newRules = normalizedLogic.rules.filter((_, i) => i !== idx);
+                                const updated = { ...normalizedLogic, rules: newRules };
+                                updateField(activeField.id, { logic: updated });
+                              }}
+                              className="text-red-500 hover:text-red-700 font-semibold cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          </div>
+
+                          {/* Select Field */}
+                          <select 
+                            className="w-full p-2 border border-gray-250 rounded text-xs bg-white"
+                            value={rule.fieldId || ''}
+                            onChange={(e) => {
+                              const newRules = [...normalizedLogic.rules];
+                              newRules[idx] = { ...newRules[idx], fieldId: e.target.value, value: '' };
+                              const updated = { ...normalizedLogic, rules: newRules };
+                              updateField(activeField.id, { logic: updated });
+                            }}
+                          >
+                            <option value="">Select Target Field...</option>
+                            {schemaData.filter(f => f.id !== activeField.id && f.type !== 'page_break').map(f => (
+                              <option key={f.id} value={f.id}>{f.label || f.id} ({f.type})</option>
+                            ))}
+                          </select>
+
+                          {rule.fieldId && (
+                            <>
+                              {/* Operator */}
+                              <select 
+                                className="w-full p-2 border border-gray-250 rounded text-xs bg-white"
+                                value={rule.operator || '=='}
+                                onChange={(e) => {
+                                  const newRules = [...normalizedLogic.rules];
+                                  newRules[idx] = { ...newRules[idx], operator: e.target.value };
+                                  const updated = { ...normalizedLogic, rules: newRules };
+                                  updateField(activeField.id, { logic: updated });
+                                }}
+                              >
+                                <option value="==">Equals</option>
+                                <option value="!=">Not Equals</option>
+                                <option value="contains">Contains</option>
+                                <option value="<">Less Than</option>
+                                <option value=">">Greater Than</option>
+                              </select>
+
+                              {/* Value Input */}
+                              {hasOptions ? (
+                                <select
+                                  className="w-full p-2 border border-gray-250 rounded text-xs bg-white"
+                                  value={rule.value || ''}
+                                  onChange={(e) => {
+                                    const newRules = [...normalizedLogic.rules];
+                                    newRules[idx] = { ...newRules[idx], value: e.target.value };
+                                    const updated = { ...normalizedLogic, rules: newRules };
+                                    updateField(activeField.id, { logic: updated });
+                                  }}
+                                >
+                                  <option value="">Select Value...</option>
+                                  {opts.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
+                                </select>
+                              ) : (
+                                <input 
+                                  className="w-full p-2 border border-gray-250 rounded text-xs bg-white font-medium"
+                                  placeholder="Type value..."
+                                  value={rule.value || ''}
+                                  onChange={(e) => {
+                                    const newRules = [...normalizedLogic.rules];
+                                    newRules[idx] = { ...newRules[idx], value: e.target.value };
+                                    const updated = { ...normalizedLogic, rules: newRules };
+                                    updateField(activeField.id, { logic: updated });
+                                  }}
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newRules = [...normalizedLogic.rules, { fieldId: '', operator: '==', value: '' }];
+                      const updated = { ...normalizedLogic, rules: newRules };
+                      updateField(activeField.id, { logic: updated });
+                    }}
+                    className="w-full py-2.5 bg-white text-purple-700 hover:bg-purple-100/50 font-bold border border-purple-200 border-dashed rounded-lg transition text-[11px] flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    + Add Condition
+                  </button>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
 
           <div className="border-t border-gray-100 pt-6 mt-8">
-            <button 
+            <button
               onClick={() => {
                 setSchemaData(schemaData.filter(f => f.id !== activeField.id));
                 setActiveFieldId(null);

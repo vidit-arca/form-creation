@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
+import { NavBar } from './NavBar';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -134,8 +135,9 @@ export function HomePage() {
     setContext({});
   };
 
-  const recentSubs = submissions.slice(-3).reverse();
-  const todayCount = submissions.filter(s => {
+  const validSubmissions = Array.isArray(submissions) ? submissions : [];
+  const recentSubs = validSubmissions.slice(-3).reverse();
+  const todayCount = validSubmissions.filter(s => {
     const d = new Date(s.submitted_at);
     const now = new Date();
     return d.toDateString() === now.toDateString();
@@ -143,21 +145,7 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
-      {/* Nav */}
-      <nav className="bg-white/80 backdrop-blur-xl border-b border-emerald-100/60 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" /></svg>
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-emerald-700 to-teal-600 bg-clip-text text-transparent tracking-tight">HaloHealthForms</span>
-          </div>
-          <Link to="/history" className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-2 rounded-xl border border-emerald-200/60 transition-all">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            My Submissions
-          </Link>
-        </div>
-      </nav>
+      <NavBar />
 
       <div className="max-w-5xl mx-auto px-6 py-10">
         {/* Hero */}

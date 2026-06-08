@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, useWatch, Controller } from 'react-hook-form';
 import SignatureCanvas from 'react-signature-canvas';
 import { QRScannerComponent } from './components/QRScannerComponent';
@@ -11,7 +11,13 @@ import { validateCohortRules } from './components/validateCohortRules';
 import { CohortInputComponent } from './components/CohortInputComponent';
 import { HomePage } from './components/HomePage';
 import Select from 'react-select';
-import { addSubmissionToQueue, formCacheStore } from './utils/storage';
+import { addSubmissionToQueue, formCacheStore, saveDraft, getDraft, deleteDraft } from './utils/storage';
+import { NavBar } from './components/NavBar';
+import { Save, ChevronLeft, ArrowLeft, FolderHeart } from 'lucide-react';
+import { NetworkStatusBanner } from './components/NetworkStatusBanner';
+import { SubmissionHistory as OfflineHistory } from './components/SubmissionHistory';
+import { SavedDrafts } from './components/SavedDrafts';
+import { IntakeForm } from './components/IntakeForm';
 
 const reactSelectPatientStyles = {
   control: (base, state) => ({
@@ -183,24 +189,7 @@ function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
 
       {/* ─── Navigation ─── */}
-      <nav className="bg-white/80 backdrop-blur-xl border-b border-emerald-100/60 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition">
-              <div className="w-9 h-9 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" />
-                </svg>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-emerald-700 to-teal-600 bg-clip-text text-transparent tracking-tight">HaloHealthForms</span>
-            </Link>
-          </div>
-          <Link to="/history" className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-2 rounded-xl border border-emerald-200/60 transition-all">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            My Submissions
-          </Link>
-        </div>
-      </nav>
+      <NavBar />
 
       <div className="max-w-5xl mx-auto px-6 py-10">
 
@@ -319,8 +308,89 @@ function Dashboard() {
   );
 }
 
+function evaluateLogic(logic, formValues) {
+  if (!logic) return { isVisible: true, isRequired: false };
+
+  const action = logic.action || 'show';
+  const joinType = logic.joinType || 'AND';
+  let rules = logic.rules || [];
+
+  // Support backward compatibility for old single-rule format
+  if (logic.fieldId) {
+    rules = [{
+      fieldId: logic.fieldId,
+      operator: logic.operator || '==',
+      value: logic.value
+    }];
+  }
+
+  // Filter out invalid rules (no fieldId set yet)
+  const validRules = rules.filter(r => r && r.fieldId);
+
+  if (validRules.length === 0) {
+    return { isVisible: true, isRequired: false };
+  }
+
+  const ruleResults = validRules.map(rule => {
+    const depVal = formValues[rule.fieldId];
+    const targetVal = rule.value;
+    const op = rule.operator || '==';
+
+    // Normalize: arrays (multi_select) → string for comparison
+    let val;
+    if (Array.isArray(depVal)) {
+      val = depVal; // keep as array for 'contains'
+    } else if (typeof depVal === 'object' && depVal !== null) {
+      if (depVal.age !== undefined) val = depVal.age;
+      else if (depVal.bmi !== undefined) val = depVal.bmi;
+      else if (depVal.score !== undefined) val = depVal.score;
+      else val = String(depVal);
+    } else {
+      val = depVal === undefined || depVal === null ? '' : depVal;
+    }
+
+    let conditionMet = false;
+    if (op === '==') {
+      if (Array.isArray(val)) conditionMet = val.includes(String(targetVal));
+      else conditionMet = (String(val) === String(targetVal));
+    } else if (op === '!=') {
+      if (Array.isArray(val)) conditionMet = !val.includes(String(targetVal));
+      else conditionMet = (String(val) !== String(targetVal));
+    } else if (op === '<') conditionMet = (Number(val) < Number(targetVal));
+    else if (op === '>') conditionMet = (Number(val) > Number(targetVal));
+    else if (op === 'contains') {
+      if (Array.isArray(val)) conditionMet = val.some(v => String(v).toLowerCase().includes(String(targetVal).toLowerCase()));
+      else conditionMet = (val && String(val).toLowerCase().includes(String(targetVal).toLowerCase()));
+    }
+
+    return conditionMet;
+  });
+
+  let overallConditionMet = false;
+  if (joinType === 'OR') {
+    overallConditionMet = ruleResults.some(r => r);
+  } else {
+    overallConditionMet = ruleResults.every(r => r);
+  }
+
+  let isVisible = true;
+  let isRequired = false;
+
+  if (overallConditionMet) {
+    if (action === 'hide') isVisible = false;
+    if (action === 'require') isRequired = true;
+  } else {
+    if (action === 'show') isVisible = false;
+  }
+
+  return { isVisible, isRequired };
+}
+
 function FormRenderer() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const draftIdParam = searchParams.get('draftId');
+  const [activeDraftId, setActiveDraftId] = useState(draftIdParam || null);
   const [formConfig, setFormConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -328,6 +398,38 @@ function FormRenderer() {
 
   const { register, handleSubmit, control, trigger, setValue, getValues, reset, formState: { errors } } = useForm();
   const formValues = useWatch({ control });
+
+  // Filters options based on optionConditions config (e.g. GDM only for Female)
+  const getVisibleOptions = (field) => {
+    const options = field.options || [];
+    const conditions = field.optionConditions || {};
+    if (Object.keys(conditions).length === 0) return options;
+    return options.filter(opt => {
+      const cond = conditions[opt];
+      if (!cond || !cond.fieldId) return true; // no condition = always visible
+      const depVal = formValues?.[cond.fieldId] ?? '';
+      const targetVal = String(cond.value ?? '');
+      const actualVal = String(depVal);
+      if (cond.operator === '!=') return actualVal !== targetVal;
+      return actualVal === targetVal;
+    });
+  };
+
+  const handleSaveDraft = async () => {
+    try {
+      const currentValues = getValues();
+      const formTitle = formConfig?.title || 'Unknown Form';
+      
+      const savedId = await saveDraft(activeDraftId, id, formTitle, currentValues);
+      setActiveDraftId(savedId);
+      
+      alert("Draft saved successfully!");
+      navigate('/drafts');
+    } catch (e) {
+      console.error("Failed to save draft:", e);
+      alert("Error saving draft. Please try again.");
+    }
+  };
 
   useEffect(() => {
     const loadForm = async () => {
@@ -339,9 +441,20 @@ function FormRenderer() {
         
         // Cache form schema for offline use
         await formCacheStore.setItem(id.toString(), data);
-        
         setFormConfig(data);
-        reset({}); // IMPORTANT: Wipe any old data from previous sessions
+
+        // Load draft answers if activeDraftId exists
+        if (activeDraftId) {
+          const draft = await getDraft(activeDraftId);
+          if (draft && draft.answers) {
+            reset(draft.answers);
+          } else {
+            reset({});
+          }
+        } else {
+          reset({});
+        }
+        
         setLoading(false);
       } catch (err) {
         console.warn("Online form fetch failed, trying local cache...", err);
@@ -349,7 +462,19 @@ function FormRenderer() {
           const cachedData = await formCacheStore.getItem(id.toString());
           if (cachedData) {
             setFormConfig(cachedData);
-            reset({});
+            
+            // Load draft answers if activeDraftId exists
+            if (activeDraftId) {
+              const draft = await getDraft(activeDraftId);
+              if (draft && draft.answers) {
+                reset(draft.answers);
+              } else {
+                reset({});
+              }
+            } else {
+              reset({});
+            }
+            
             setLoading(false);
             return;
           }
@@ -358,12 +483,12 @@ function FormRenderer() {
         }
         
         alert("Error loading form or form not published. Please check your internet connection.");
-        navigate('/');
+        navigate('/forms');
       }
     };
 
     loadForm();
-  }, [id, navigate]);
+  }, [id, activeDraftId, navigate]);
 
   // Split schema into pages and handle Exclusive Stop Criteria
   const { pages, isTerminated } = useMemo(() => {
@@ -403,25 +528,8 @@ function FormRenderer() {
     // Filter pages based on conditional logic
     const filteredPages = p.filter((page, index) => {
       if (index === 0) return true;
-      if (page.logic && page.logic.fieldId) {
-        const depVal = formValues[page.logic.fieldId];
-        const targetVal = page.logic.value;
-        const op = page.logic.operator || '==';
-        const action = page.logic.action || 'show';
-
-        let conditionMet = false;
-        const val = depVal === undefined || depVal === null ? '' : depVal;
-
-        if (op === '==') conditionMet = (String(val) === String(targetVal));
-        if (op === '!=') conditionMet = (String(val) !== String(targetVal));
-        if (op === '<') conditionMet = (Number(val) < Number(targetVal));
-        if (op === '>') conditionMet = (Number(val) > Number(targetVal));
-        if (op === 'contains') conditionMet = (val && String(val).toLowerCase().includes(String(targetVal).toLowerCase()));
-
-        if (conditionMet && action === 'hide') return false;
-        if (!conditionMet && action === 'show') return false;
-      }
-      return true;
+      const { isVisible } = evaluateLogic(page.logic, formValues);
+      return isVisible;
     });
 
     return { pages: filteredPages, isTerminated: terminated };
@@ -468,7 +576,16 @@ function FormRenderer() {
       if (consumedFieldIds.has(field.id)) return;
 
       const key = field.variableName || slugify(field.label) || field.id;
-      const val = data.hasOwnProperty(field.id) ? data[field.id] : null;
+      let val = data.hasOwnProperty(field.id) ? data[field.id] : null;
+
+      const otherText = data[`${field.id}_otherText`];
+      if (otherText) {
+        if (Array.isArray(val)) {
+          val = val.map(item => String(item).toLowerCase() === 'other' ? `Other: ${otherText}` : item);
+        } else if (String(val).toLowerCase() === 'other') {
+          val = `Other: ${otherText}`;
+        }
+      }
 
       // Normalize: treat false, empty string, and undefined as null for non-checkbox fields
       if (val === undefined || val === "") {
@@ -503,6 +620,7 @@ function FormRenderer() {
       if (!navigator.onLine) {
         // Offline Queuing
         await addSubmissionToQueue(finalPayload);
+        if (activeDraftId) await deleteDraft(activeDraftId);
         alert("⚠️ Offline Mode: Form completed successfully! Your answers are saved locally and will automatically sync when you reconnect.");
         navigate('/history');
       } else {
@@ -513,12 +631,14 @@ function FormRenderer() {
           body: JSON.stringify({ data: submissionPayload })
         });
         if (res.ok) {
+          if (activeDraftId) await deleteDraft(activeDraftId);
           alert("Form submitted successfully!");
           navigate('/history');
         } else {
           // If the server is unreachable (5xx/4xx), maybe we should also queue it?
           // For now, let's queue it as a fallback.
           await addSubmissionToQueue(finalPayload);
+          if (activeDraftId) await deleteDraft(activeDraftId);
           alert("Server issue detected. Saved locally to sync later.");
           navigate('/history');
         }
@@ -531,6 +651,7 @@ function FormRenderer() {
         formTitle: formConfig?.title || 'Unknown Form',
         payload: submissionPayload,
       });
+      if (activeDraftId) await deleteDraft(activeDraftId);
       alert("Network error. Saved locally to sync later.");
       navigate('/history');
     }
@@ -575,28 +696,9 @@ function FormRenderer() {
             let isVisible = true;
 
             // Evaluate conditional logic
-            if (field.logic && field.logic.fieldId) {
-              const depVal = formValues[field.logic.fieldId];
-              const targetVal = field.logic.value;
-              const op = field.logic.operator || '==';
-              const action = field.logic.action || 'show';
-
-              let conditionMet = false;
-              const val = depVal === undefined || depVal === null ? '' : depVal;
-
-              if (op === '==') conditionMet = (String(val) === String(targetVal));
-              if (op === '!=') conditionMet = (String(val) !== String(targetVal));
-              if (op === '<') conditionMet = (Number(val) < Number(targetVal));
-              if (op === '>') conditionMet = (Number(val) > Number(targetVal));
-              if (op === 'contains') conditionMet = (val && String(val).toLowerCase().includes(String(targetVal).toLowerCase()));
-
-              if (conditionMet) {
-                if (action === 'hide') isVisible = false;
-                if (action === 'require') isRequired = true;
-              } else {
-                if (action === 'show') isVisible = false;
-              }
-            }
+            const logicResult = evaluateLogic(field.logic, formValues);
+            if (!logicResult.isVisible) isVisible = false;
+            if (logicResult.isRequired) isRequired = true;
 
             if (!isVisible) return null;
 
@@ -632,6 +734,17 @@ function FormRenderer() {
                 }
                 const cohortValue = getValues(linkedCohortField.id);
                 return validateCohortRules(cohortValue, getValues(), linkedCohortField);
+              };
+            }
+
+            if (field.type === 'cohort_input') {
+              const baseValidate = validationRules.validate;
+              validationRules.validate = (value) => {
+                if (baseValidate) {
+                  const baseRes = baseValidate(value);
+                  if (baseRes !== true) return baseRes;
+                }
+                return validateCohortRules(value, getValues(), field);
               };
             }
 
@@ -673,6 +786,7 @@ function FormRenderer() {
                     type="number"
                     className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
                     placeholder={field.placeholder || "0"}
+                    onWheel={(e) => e.target.blur()}
                     {...register(field.id, validationRules)}
                   />
                 )}
@@ -695,13 +809,24 @@ function FormRenderer() {
                   />
                 )}
 
-                {field.type === 'date' && (
-                  <input
-                    type="date"
-                    className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
-                    {...register(field.id, validationRules)}
-                  />
-                )}
+                {field.type === 'date' && (() => {
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  const minAttr = field.validation?.minDate === 'today' ? todayStr : (field.validation?.minDate && field.validation?.minDate !== 'none' ? field.validation.minDate : undefined);
+                  const maxAttr = field.validation?.maxDate === 'today' ? todayStr : (field.validation?.maxDate && field.validation?.maxDate !== 'none' ? field.validation.maxDate : undefined);
+                  return (
+                    <input
+                      type="date"
+                      className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                      min={minAttr}
+                      max={maxAttr}
+                      {...register(field.id, {
+                        ...validationRules,
+                        ...(minAttr ? { min: { value: minAttr, message: `Date must be on or after ${minAttr === todayStr ? 'today' : minAttr}` } } : {}),
+                        ...(maxAttr ? { max: { value: maxAttr, message: `Date must be on or before ${maxAttr === todayStr ? 'today' : maxAttr}` } } : {}),
+                      })}
+                    />
+                  );
+                })()}
 
                 {field.type === 'time' && (
                   <input
@@ -710,6 +835,20 @@ function FormRenderer() {
                     {...register(field.id, validationRules)}
                   />
                 )}
+
+                {field.type === 'year' && (() => {
+                  const currentYear = new Date().getFullYear();
+                  const years = Array.from({ length: 120 }, (_, i) => currentYear - i);
+                  return (
+                    <select
+                      className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                      {...register(field.id, validationRules)}
+                    >
+                      <option value="">{field.placeholder || "Select Year..."}</option>
+                      {years.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  );
+                })()}
 
                 {field.type === 'checkbox' && (
                   <div className="flex items-center mt-1 bg-white p-3 border border-gray-200 rounded-lg">
@@ -723,38 +862,58 @@ function FormRenderer() {
                 )}
 
                 {field.type === 'dropdown' && (
-                  <select
-                    className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
-                    {...register(field.id, validationRules)}
-                  >
-                    <option value="">{field.placeholder || "Select..."}</option>
-                    {(field.options || []).map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                )}
-                {field.type === 'searchable_dropdown' && (
-                  <Controller
-                    name={field.id}
-                    control={control}
-                    rules={validationRules}
-                    render={({ field: { onChange, value, ref } }) => (
-                      <Select
-                        inputRef={ref}
-                        options={(field.options || []).map(opt => ({ label: opt, value: opt }))}
-                        value={value ? { label: value, value: value } : null}
-                        onChange={val => onChange(val ? val.value : '')}
-                        isClearable
-                        placeholder={field.placeholder || "Select..."}
-                        styles={reactSelectPatientStyles}
+                  <div className="space-y-2">
+                    <select
+                      className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                      {...register(field.id, validationRules)}
+                    >
+                      <option value="">{field.placeholder || "Select..."}</option>
+                      {getVisibleOptions(field).map((opt, i) => (
+                        <option key={i} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    {String(formValues?.[field.id] || '').toLowerCase() === 'other' && (
+                      <input
+                        type="text"
+                        placeholder="Please specify..."
+                        className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                        {...register(`${field.id}_otherText`, { required: "Please specify" })}
                       />
                     )}
-                  />
+                  </div>
+                )}
+                {field.type === 'searchable_dropdown' && (
+                  <div className="space-y-2">
+                    <Controller
+                      name={field.id}
+                      control={control}
+                      rules={validationRules}
+                      render={({ field: { onChange, value, ref } }) => (
+                        <Select
+                          inputRef={ref}
+                          options={getVisibleOptions(field).map(opt => ({ label: opt, value: opt }))}
+                          value={value ? { label: value, value: value } : null}
+                          onChange={val => onChange(val ? val.value : '')}
+                          isClearable
+                          placeholder={field.placeholder || "Select..."}
+                          styles={reactSelectPatientStyles}
+                        />
+                      )}
+                    />
+                    {String(formValues?.[field.id] || '').toLowerCase() === 'other' && (
+                      <input
+                        type="text"
+                        placeholder="Please specify..."
+                        className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                        {...register(`${field.id}_otherText`, { required: "Please specify" })}
+                      />
+                    )}
+                  </div>
                 )}
 
                 {field.type === 'radio' && (
                   <div className="space-y-3">
-                    {(field.options || []).map((opt, i) => (
+                    {getVisibleOptions(field).map((opt, i) => (
                       <label key={i} className="flex items-center bg-white p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-300 transition">
                         <input
                           type="radio"
@@ -765,6 +924,14 @@ function FormRenderer() {
                         <span className="ml-3 text-gray-700">{opt}</span>
                       </label>
                     ))}
+                    {String(formValues?.[field.id] || '').toLowerCase() === 'other' && (
+                      <input
+                        type="text"
+                        placeholder="Please specify..."
+                        className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                        {...register(`${field.id}_otherText`, { required: "Please specify" })}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -781,23 +948,67 @@ function FormRenderer() {
                         <span className="ml-3 text-gray-700">{opt}</span>
                       </label>
                     ))}
+                    {String(formValues?.[field.id] || '').toLowerCase() === 'other' && (
+                      <input
+                        type="text"
+                        placeholder="Please specify..."
+                        className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                        {...register(`${field.id}_otherText`, { required: "Please specify" })}
+                      />
+                    )}
                   </div>
                 )}
 
                 {field.type === 'multi_select' && (
-                  <div className="space-y-3">
-                    {(field.options || []).map((opt, i) => (
-                      <label key={i} className="flex items-center bg-white p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-300 transition">
-                        <input
-                          type="checkbox"
-                          value={opt}
-                          className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 transition"
-                          {...register(field.id, validationRules)}
-                        />
-                        <span className="ml-3 text-gray-700">{opt}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <Controller
+                    name={field.id}
+                    control={control}
+                    rules={validationRules}
+                    render={({ field: { onChange, value } }) => {
+                      const currentValues = Array.isArray(value) ? value : [];
+                      return (
+                        <div className="space-y-3">
+                          {getVisibleOptions(field).map((opt, i) => {
+                            const isNone = opt.toLowerCase() === 'none' || opt.toLowerCase() === 'none of the above' || opt.toLowerCase() === 'none of these';
+                            return (
+                              <label key={i} className="flex items-center bg-white p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-300 transition">
+                                <input
+                                  type="checkbox"
+                                  value={opt}
+                                  checked={currentValues.includes(opt)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      if (isNone) {
+                                        onChange([opt]); // Selecting None clears everything else
+                                      } else {
+                                        // Selecting anything else clears None
+                                        onChange([...currentValues.filter(v => {
+                                          const l = v.toLowerCase();
+                                          return l !== 'none' && l !== 'none of the above' && l !== 'none of these';
+                                        }), opt]);
+                                      }
+                                    } else {
+                                      onChange(currentValues.filter(v => v !== opt));
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 transition"
+                                />
+                                <span className="ml-3 text-gray-700">{opt}</span>
+                              </label>
+                            );
+                          })}
+                          {(Array.isArray(value) ? value : []).some(v => String(v).toLowerCase() === 'other') && (
+                            <input
+                              type="text"
+                              placeholder="Please specify..."
+                              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                              {...register(`${field.id}_otherText`, { required: "Please specify" })}
+                            />
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
                 )}
                 {field.type === 'searchable_multi_select' && (
                   <Controller
@@ -805,16 +1016,49 @@ function FormRenderer() {
                     control={control}
                     rules={validationRules}
                     render={({ field: { onChange, value, ref } }) => (
-                      <Select
-                        inputRef={ref}
-                        isMulti
-                        options={(field.options || []).map(opt => ({ label: opt, value: opt }))}
+                      <div className="space-y-2">
+                        <Select
+                          inputRef={ref}
+                          isMulti
+                          options={getVisibleOptions(field).map(opt => ({ label: opt, value: opt }))}
                         value={(value || []).map(v => ({ label: v, value: v }))}
-                        onChange={vals => onChange(vals ? vals.map(v => v.value) : [])}
+                        onChange={vals => {
+                          if (!vals || vals.length === 0) {
+                            onChange([]);
+                            return;
+                          }
+                          
+                          // Check if 'None' was just selected
+                          const lastAdded = vals[vals.length - 1].value;
+                          const isLastAddedNone = lastAdded.toLowerCase() === 'none' || lastAdded.toLowerCase() === 'none of the above' || lastAdded.toLowerCase() === 'none of these';
+                          
+                          if (isLastAddedNone) {
+                            // If 'None' is selected, clear everything else
+                            onChange([lastAdded]);
+                          } else {
+                            // If something else is selected, remove any existing 'None'
+                            onChange(vals
+                              .filter(v => {
+                                const l = v.value.toLowerCase();
+                                return l !== 'none' && l !== 'none of the above' && l !== 'none of these';
+                              })
+                              .map(v => v.value)
+                            );
+                          }
+                        }}
                         isClearable
-                        placeholder={field.placeholder || "Select options..."}
-                        styles={reactSelectPatientStyles}
-                      />
+                            placeholder={field.placeholder || "Select options..."}
+                            styles={reactSelectPatientStyles}
+                          />
+                          {(Array.isArray(value) ? value : []).some(v => String(v).toLowerCase() === 'other') && (
+                            <input
+                              type="text"
+                              placeholder="Please specify..."
+                              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                              {...register(`${field.id}_otherText`, { required: "Please specify" })}
+                            />
+                          )}
+                      </div>
                     )}
                   />
                 )}
@@ -910,8 +1154,8 @@ function FormRenderer() {
                     name={field.id}
                     control={control}
                     rules={validationRules}
-                    render={({ field: { onChange } }) => (
-                      <QRScannerComponent field={field} onChange={onChange} setValue={setValue} />
+                    render={({ field: { onChange, value } }) => (
+                      <QRScannerComponent field={field} value={value} onChange={onChange} setValue={setValue} />
                     )}
                   />
                 )}
@@ -987,14 +1231,24 @@ function FormRenderer() {
             </div>
           )}
 
-          <div className="pt-6 border-t border-gray-100 mt-8 flex justify-between gap-4">
-            {currentPageIndex > 0 ? (
-              <button type="button" onClick={handlePrevPage} className="flex-1 bg-gray-100 text-gray-700 px-6 py-3.5 rounded-xl font-bold text-lg hover:bg-gray-200 transition">
-                Previous
+          <div className="pt-6 border-t border-gray-100 mt-8 flex flex-col sm:flex-row justify-between gap-4">
+            <div className="flex gap-2 flex-1">
+              {currentPageIndex > 0 ? (
+                <button type="button" onClick={handlePrevPage} className="flex-1 bg-slate-100 text-slate-700 px-4 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                  <ChevronLeft className="w-4 h-4" /> Previous
+                </button>
+              ) : (
+                <button type="button" onClick={() => navigate('/forms')} className="flex-1 bg-slate-100 text-slate-700 px-4 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                  <ArrowLeft className="w-4 h-4" /> Exit
+                </button>
+              )}
+              
+              <button type="button" onClick={handleSaveDraft} className="flex-1 bg-amber-50 text-amber-700 border border-amber-200 px-4 py-3 rounded-xl font-bold text-sm hover:bg-amber-100/80 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                <FolderHeart className="w-4 h-4" /> Save Draft
               </button>
-            ) : <div></div>}
+            </div>
 
-            <button type="submit" className={`flex-1 text-white px-6 py-3.5 rounded-xl font-bold text-lg transition shadow-md hover:shadow-lg ${isTerminated ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}>
+            <button type="submit" className={`flex-1 text-white px-6 py-3 rounded-xl font-bold text-md transition shadow-md hover:shadow-lg cursor-pointer ${isTerminated ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
               {isTerminated ? 'End & Submit Form' : (currentPageIndex < totalPages - 1 ? 'Next' : 'Submit Form')}
             </button>
           </div>
@@ -1047,9 +1301,6 @@ function History() {
   );
 }
 
-import { NetworkStatusBanner } from './components/NetworkStatusBanner';
-import { SubmissionHistory as OfflineHistory } from './components/SubmissionHistory';
-import { IntakeForm } from './components/IntakeForm';
 
 function App() {
   return (
@@ -1059,6 +1310,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/forms" element={<Dashboard />} />
         <Route path="/fill/:id" element={<FormRenderer />} />
+        <Route path="/drafts" element={<SavedDrafts />} />
         <Route path="/history" element={<OfflineHistory />} />
         <Route path="/demo" element={<IntakeForm />} />
       </Routes>
