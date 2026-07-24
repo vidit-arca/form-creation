@@ -12,6 +12,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/vite": "^4.2.4",
+    "expr-eval": "^2.0.2",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "localforage": "^1.10.0",

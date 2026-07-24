@@ -3,6 +3,43 @@ import { Link, useParams } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
+/**
+ * Converts any field value to a human-readable string.
+ * Handles plain values, Date-like objects {day,month,year}, arrays, and generic objects.
+ */
+function formatCellValue(value) {
+  if (value === null || value === undefined || value === '') return '-';
+
+  // Plain primitive
+  if (typeof value !== 'object') return String(value);
+
+  // Array → join items
+  if (Array.isArray(value)) {
+    return value.map(formatCellValue).join(', ') || '-';
+  }
+
+  // Date-like object: { day, month, year } or { date } or ISO string keys
+  if ('day' in value || 'month' in value || 'year' in value) {
+    const { day, month, year } = value;
+    const parts = [
+      year,
+      month !== undefined ? String(month).padStart(2, '0') : undefined,
+      day   !== undefined ? String(day).padStart(2, '0')   : undefined,
+    ].filter(Boolean);
+    return parts.join('-');  // e.g. "2026-06-18"
+  }
+
+  // GPS / coordinate object
+  if ('lat' in value || 'latitude' in value) {
+    const lat = value.lat ?? value.latitude;
+    const lng = value.lng ?? value.longitude ?? value.lon;
+    return lng !== undefined ? `${lat}, ${lng}` : String(lat);
+  }
+
+  // Generic object → JSON
+  return JSON.stringify(value);
+}
+
 export function Responses() {
   const { id, projectId } = useParams();
   const [submissions, setSubmissions] = useState([]);
@@ -17,8 +54,27 @@ export function Responses() {
       });
   }, [id]);
 
-  const handleExport = () => {
-    window.location.href = `${API_URL}/admin/forms/${id}/export`;
+  const handleExport = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/forms/${id}/export`, {
+        // Add: headers: { Authorization: `Bearer ${getToken()}` } once auth is implemented
+      });
+      if (!res.ok) {
+        alert('Export failed. Please try again.');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `form_${id}_export.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Could not connect to the server. Please check your network.');
+    }
   };
 
   // Context-aware back link
@@ -91,7 +147,7 @@ export function Responses() {
                   </>
                 )}
                 {headerList.map(h => (
-                  <td key={h} className="p-4 font-medium text-gray-800">{sub.data[h]?.toString() || '-'}</td>
+                  <td key={h} className="p-4 font-medium text-gray-800">{formatCellValue(sub.data[h])}</td>
                 ))}
               </tr>
             ))}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { NavBar } from './NavBar';
+import { readContext, writeContext, clearContext } from '../utils/context';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -15,21 +16,19 @@ export function HomePage() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    // Check for existing context
-    try {
-      const ctx = JSON.parse(localStorage.getItem('haloform_context')) || {};
+    // Check for existing context — validated through schema before use
+      const ctx = readContext();
       setContext(ctx);
-    } catch {}
 
     // Fetch submission count for analytics
     fetch(`${API_URL}/patient/submissions`)
       .then(r => r.json())
       .then(data => setSubmissions(data))
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       if (html5QrCode.current?.isScanning) {
-        html5QrCode.current.stop().catch(() => {});
+        html5QrCode.current.stop().catch(() => { });
       }
     };
   }, []);
@@ -67,17 +66,17 @@ export function HomePage() {
         const onSuccess = (decodedText) => handleScan(decodedText);
 
         // Find the back/rear camera if available
-        const backCamera = devices.find(device => 
-          device.label.toLowerCase().includes('back') || 
-          device.label.toLowerCase().includes('rear') || 
+        const backCamera = devices.find(device =>
+          device.label.toLowerCase().includes('back') ||
+          device.label.toLowerCase().includes('rear') ||
           device.label.toLowerCase().includes('environment')
         ) || devices[devices.length - 1]; // Fallback to the last camera (often rear)
 
         try {
-          await html5QrCode.current.start(backCamera.id, config, onSuccess, () => {});
+          await html5QrCode.current.start(backCamera.id, config, onSuccess, () => { });
         } catch {
           // Fallback to facingMode if starting by device ID fails
-          await html5QrCode.current.start({ facingMode: "environment" }, config, onSuccess, () => {});
+          await html5QrCode.current.start({ facingMode: "environment" }, config, onSuccess, () => { });
         }
       } catch (err) {
         console.error('Camera initialization failed:', err);
@@ -89,7 +88,7 @@ export function HomePage() {
 
   const stopScanning = async () => {
     if (html5QrCode.current?.isScanning) {
-      await html5QrCode.current.stop().catch(() => {});
+      await html5QrCode.current.stop().catch(() => { });
     }
     setIsScanning(false);
   };
@@ -103,7 +102,7 @@ export function HomePage() {
       const center = parsed.searchParams.get('center');
       if (project || site) {
         const ctx = { project, site, center };
-        localStorage.setItem('haloform_context', JSON.stringify(ctx));
+        writeContext(ctx);   // validated write — strips unknown keys
         navigate(`/forms?project=${project || ''}&site=${site || ''}${center ? '&center=' + center : ''}`);
       } else {
         navigate('/forms');
@@ -130,8 +129,8 @@ export function HomePage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const clearContext = () => {
-    localStorage.removeItem('haloform_context');
+  const handleClearContext = () => {
+    clearContext();
     setContext({});
   };
 
@@ -155,6 +154,22 @@ export function HomePage() {
             <div className="absolute left-1/3 -bottom-20 w-80 h-80 bg-white rounded-full"></div>
           </div>
           <div className="relative z-10">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center ring-1 ring-white/30">
+                <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" />
+                </svg>
+              </div>
+              <span className="text-white/90 text-sm font-bold tracking-wide"><span className="font-extrabold text-white">Halo</span><span className="ml-0.5">Health<span className="ml-[2px]">Forms</span></span></span>
+            </div>
+            
+            <div className="mb-3">
+              <span className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm text-emerald-100 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-white/20">
+                <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span>
+                Health(Care) Assessment &amp; Lifestyle Operating Tool
+              </span>
+            </div>
+
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">Welcome to Your<br />Health Portal</h1>
             <p className="text-emerald-100 mt-3 text-lg max-w-lg leading-relaxed">Scan the QR code at your hospital or center to get started with your forms.</p>
           </div>
@@ -180,7 +195,7 @@ export function HomePage() {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
                 Continue to Forms
               </Link>
-              <button onClick={clearContext} className="text-xs text-slate-400 hover:text-red-500 transition px-2 py-1 rounded-lg hover:bg-red-50">✕</button>
+              <button onClick={handleClearContext} className="text-xs text-slate-400 hover:text-red-500 transition px-2 py-1 rounded-lg hover:bg-red-50">✕</button>
             </div>
           </div>
         )}
@@ -277,9 +292,16 @@ export function HomePage() {
 
       {/* Footer */}
       <div className="border-t border-emerald-100/60 bg-white/40 backdrop-blur-sm mt-16">
-        <div className="max-w-5xl mx-auto px-6 py-6 flex items-center justify-between text-sm text-slate-400">
-          <span>HaloHealthForms Patient Portal</span>
-          <span>Your data is secure & confidential</span>
+        <div className="max-w-5xl mx-auto px-6 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-md flex items-center justify-center">
+              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" /></svg>
+            </div>
+            <span className="text-sm font-semibold"><span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">Halo</span><span className="text-slate-600 ml-0.5">Health<span className="ml-[2px]">Forms</span></span></span>
+            <span className="text-slate-300 text-xs">·</span>
+            <span className="text-xs text-slate-400">Patient Portal</span>
+          </div>
+          <span className="text-xs text-slate-400">Your data is secure &amp; confidential</span>
         </div>
       </div>
     </div>

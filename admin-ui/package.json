@@ -15,6 +15,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/vite": "^4.2.4",
+    "expr-eval": "^2.0.2",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.11.0",

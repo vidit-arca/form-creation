@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useWatch } from 'react-hook-form';
+import { Parser } from 'expr-eval';
+
+const _parser = new Parser();
 
 const slugify = (text) => {
   if (!text) return "";
@@ -69,8 +72,7 @@ export function CalculatedScoreComponent({ field, control, schemaData, onChange 
       });
 
       try {
-        const fn = new Function(`return ${jsExpr}`);
-        sum = Number(fn()) || 0;
+        sum = Number(_parser.parse(jsExpr).evaluate()) || 0;
       } catch (e) {
         sum = 0;
       }

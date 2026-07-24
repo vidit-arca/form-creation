@@ -713,14 +713,16 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                       <div className="flex gap-2 items-center">
                         <span className="text-xs text-gray-500">Min:</span>
                         <input type="number" className="w-16 p-1 text-sm border border-gray-300 rounded" value={t.min} onChange={e => {
-                          const newT = [...activeField.scoreThresholds];
-                          newT[i].min = Number(e.target.value);
+                          const newT = activeField.scoreThresholds.map((item, idx) =>
+                            idx === i ? { ...item, min: Number(e.target.value) } : item
+                          );
                           updateField(activeField.id, { scoreThresholds: newT });
                         }} />
                         <span className="text-xs text-gray-500">Max:</span>
                         <input type="number" className="w-16 p-1 text-sm border border-gray-300 rounded" value={t.max} onChange={e => {
-                          const newT = [...activeField.scoreThresholds];
-                          newT[i].max = Number(e.target.value);
+                          const newT = activeField.scoreThresholds.map((item, idx) =>
+                            idx === i ? { ...item, max: Number(e.target.value) } : item
+                          );
                           updateField(activeField.id, { scoreThresholds: newT });
                         }} />
                         <button className="ml-auto text-red-500 text-xs hover:underline" onClick={() => {
@@ -730,13 +732,15 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                       </div>
                       <div className="flex gap-2">
                         <input type="text" className="flex-1 p-2 text-sm border border-gray-300 rounded" placeholder="Badge Label" value={t.label} onChange={e => {
-                          const newT = [...activeField.scoreThresholds];
-                          newT[i].label = e.target.value;
+                          const newT = activeField.scoreThresholds.map((item, idx) =>
+                            idx === i ? { ...item, label: e.target.value } : item
+                          );
                           updateField(activeField.id, { scoreThresholds: newT });
                         }} />
                         <select className="w-24 p-2 text-sm border border-gray-300 rounded" value={t.color} onChange={e => {
-                          const newT = [...activeField.scoreThresholds];
-                          newT[i].color = e.target.value;
+                          const newT = activeField.scoreThresholds.map((item, idx) =>
+                            idx === i ? { ...item, color: e.target.value } : item
+                          );
                           updateField(activeField.id, { scoreThresholds: newT });
                         }}>
                           <option value="green">Green</option>

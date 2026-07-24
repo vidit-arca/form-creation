@@ -54,12 +54,11 @@ const reactSelectPatientStyles = {
 };
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+import { readContext, writeContext, clearContext as clearStoredContext } from './utils/context';
 
 // ── Context Helper: Read/Write site context from URL params + localStorage ──
 function getSiteContext() {
-  try {
-    return JSON.parse(localStorage.getItem('haloform_context')) || {};
-  } catch { return {}; }
+  return readContext();
 }
 
 function ContextBanner({ context, onClear }) {
@@ -102,7 +101,7 @@ function Dashboard() {
 
     // 2. If URL has context, lock it to localStorage
     if (urlContext.project || urlContext.site) {
-      localStorage.setItem('haloform_context', JSON.stringify(urlContext));
+      writeContext(urlContext);   // validated write
       setContext(urlContext);
     } else {
       // 3. Otherwise, read from localStorage
@@ -117,7 +116,7 @@ function Dashboard() {
 
   useEffect(() => {
     if (context === null) return; // Still checking
-    
+
     // Only fetch if we have context — require QR scan
     if (!context.project && !context.site) {
       setLoading(false);
@@ -134,7 +133,7 @@ function Dashboard() {
       .then(async (data) => {
         setForms(data);
         setLoading(false);
-        
+
         // Pre-cache all forms in the background for offline capability
         for (const f of data) {
           try {
@@ -177,7 +176,7 @@ function Dashboard() {
   }, [context]);
 
   const clearContext = () => {
-    localStorage.removeItem('haloform_context');
+    clearStoredContext();
     setContext({});
     setForms([]);
   };
@@ -203,14 +202,25 @@ function Dashboard() {
             <div className="absolute left-1/3 -bottom-20 w-80 h-80 bg-white rounded-full"></div>
           </div>
           <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center ring-1 ring-white/30">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" />
+                  </svg>
+                </div>
+                <span className="text-white/90 text-sm font-bold tracking-wide"><span className="font-extrabold text-white">Halo</span><span className="ml-0.5">Health<span className="ml-[2px]">Forms</span></span></span>
               </div>
-              <span className="text-emerald-200 text-sm font-semibold uppercase tracking-wider">{forms.length} Form{forms.length !== 1 ? 's' : ''} Available</span>
+              <span className="text-emerald-200 text-sm font-semibold">{forms.length} Form{forms.length !== 1 ? 's' : ''} Available</span>
             </div>
+            
+            <div className="mb-3">
+              <span className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm text-emerald-100 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-white/20">
+                <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span>
+                Health(Care) Assessment &amp; Lifestyle Operating Tool
+              </span>
+            </div>
+            
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">Welcome to Your<br />Health Portal</h1>
             <p className="text-emerald-100 mt-3 text-lg max-w-lg leading-relaxed">Complete the forms below to share your health information securely with your care provider.</p>
           </div>
@@ -299,9 +309,16 @@ function Dashboard() {
 
       {/* ─── Footer ─── */}
       <div className="border-t border-emerald-100/60 bg-white/40 backdrop-blur-sm mt-16">
-        <div className="max-w-5xl mx-auto px-6 py-6 flex items-center justify-between text-sm text-slate-400">
-          <span>HaloHealthForms Patient Portal</span>
-          <span>Your data is secure & confidential</span>
+        <div className="max-w-5xl mx-auto px-6 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-md flex items-center justify-center">
+              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" /></svg>
+            </div>
+            <span className="text-sm font-semibold"><span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">Halo</span><span className="text-slate-600 ml-0.5">Health<span className="ml-[2px]">Forms</span></span></span>
+            <span className="text-slate-300 text-xs">·</span>
+            <span className="text-xs text-slate-400">Patient Portal</span>
+          </div>
+          <span className="text-xs text-slate-400">Your data is secure &amp; confidential</span>
         </div>
       </div>
     </div>
@@ -419,10 +436,10 @@ function FormRenderer() {
     try {
       const currentValues = getValues();
       const formTitle = formConfig?.title || 'Unknown Form';
-      
+
       const savedId = await saveDraft(activeDraftId, id, formTitle, currentValues);
       setActiveDraftId(savedId);
-      
+
       alert("Draft saved successfully!");
       navigate('/drafts');
     } catch (e) {
@@ -438,7 +455,7 @@ function FormRenderer() {
         const res = await fetch(`${API_URL}/patient/forms/${id}`);
         if (!res.ok) throw new Error("Form not found");
         const data = await res.json();
-        
+
         // Cache form schema for offline use
         await formCacheStore.setItem(id.toString(), data);
         setFormConfig(data);
@@ -454,7 +471,7 @@ function FormRenderer() {
         } else {
           reset({});
         }
-        
+
         setLoading(false);
       } catch (err) {
         console.warn("Online form fetch failed, trying local cache...", err);
@@ -462,7 +479,7 @@ function FormRenderer() {
           const cachedData = await formCacheStore.getItem(id.toString());
           if (cachedData) {
             setFormConfig(cachedData);
-            
+
             // Load draft answers if activeDraftId exists
             if (activeDraftId) {
               const draft = await getDraft(activeDraftId);
@@ -474,14 +491,14 @@ function FormRenderer() {
             } else {
               reset({});
             }
-            
+
             setLoading(false);
             return;
           }
         } catch (cacheErr) {
           console.error("Cache read failed:", cacheErr);
         }
-        
+
         alert("Error loading form or form not published. Please check your internet connection.");
         navigate('/forms');
       }
@@ -505,7 +522,7 @@ function FormRenderer() {
         currentPage = { title: field.label || 'New Section', description: field.description || '', fields: [], logic: field.logic };
       } else {
         currentPage.fields.push(field);
-        
+
         // Evaluate Exclusive Stop Criteria
         if (field.enableExclusiveStop && field.exclusiveStopOptions?.length > 0) {
           const val = formValues[field.id];
@@ -559,7 +576,7 @@ function FormRenderer() {
 
     // Prepare data for submission: Use variableName, or Slugify Label, fallback to ID
     const submissionPayload = {};
-    
+
     // Identify all fields that are used as inputs for any calculated_score field
     const consumedFieldIds = new Set();
     formConfig.schema_data.forEach(field => {
@@ -1021,43 +1038,43 @@ function FormRenderer() {
                           inputRef={ref}
                           isMulti
                           options={getVisibleOptions(field).map(opt => ({ label: opt, value: opt }))}
-                        value={(value || []).map(v => ({ label: v, value: v }))}
-                        onChange={vals => {
-                          if (!vals || vals.length === 0) {
-                            onChange([]);
-                            return;
-                          }
-                          
-                          // Check if 'None' was just selected
-                          const lastAdded = vals[vals.length - 1].value;
-                          const isLastAddedNone = lastAdded.toLowerCase() === 'none' || lastAdded.toLowerCase() === 'none of the above' || lastAdded.toLowerCase() === 'none of these';
-                          
-                          if (isLastAddedNone) {
-                            // If 'None' is selected, clear everything else
-                            onChange([lastAdded]);
-                          } else {
-                            // If something else is selected, remove any existing 'None'
-                            onChange(vals
-                              .filter(v => {
-                                const l = v.value.toLowerCase();
-                                return l !== 'none' && l !== 'none of the above' && l !== 'none of these';
-                              })
-                              .map(v => v.value)
-                            );
-                          }
-                        }}
-                        isClearable
-                            placeholder={field.placeholder || "Select options..."}
-                            styles={reactSelectPatientStyles}
+                          value={(value || []).map(v => ({ label: v, value: v }))}
+                          onChange={vals => {
+                            if (!vals || vals.length === 0) {
+                              onChange([]);
+                              return;
+                            }
+
+                            // Check if 'None' was just selected
+                            const lastAdded = vals[vals.length - 1].value;
+                            const isLastAddedNone = lastAdded.toLowerCase() === 'none' || lastAdded.toLowerCase() === 'none of the above' || lastAdded.toLowerCase() === 'none of these';
+
+                            if (isLastAddedNone) {
+                              // If 'None' is selected, clear everything else
+                              onChange([lastAdded]);
+                            } else {
+                              // If something else is selected, remove any existing 'None'
+                              onChange(vals
+                                .filter(v => {
+                                  const l = v.value.toLowerCase();
+                                  return l !== 'none' && l !== 'none of the above' && l !== 'none of these';
+                                })
+                                .map(v => v.value)
+                              );
+                            }
+                          }}
+                          isClearable
+                          placeholder={field.placeholder || "Select options..."}
+                          styles={reactSelectPatientStyles}
+                        />
+                        {(Array.isArray(value) ? value : []).some(v => String(v).toLowerCase() === 'other') && (
+                          <input
+                            type="text"
+                            placeholder="Please specify..."
+                            className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                            {...register(`${field.id}_otherText`, { required: "Please specify" })}
                           />
-                          {(Array.isArray(value) ? value : []).some(v => String(v).toLowerCase() === 'other') && (
-                            <input
-                              type="text"
-                              placeholder="Please specify..."
-                              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
-                              {...register(`${field.id}_otherText`, { required: "Please specify" })}
-                            />
-                          )}
+                        )}
                       </div>
                     )}
                   />
@@ -1242,7 +1259,7 @@ function FormRenderer() {
                   <ArrowLeft className="w-4 h-4" /> Exit
                 </button>
               )}
-              
+
               <button type="button" onClick={handleSaveDraft} className="flex-1 bg-amber-50 text-amber-700 border border-amber-200 px-4 py-3 rounded-xl font-bold text-sm hover:bg-amber-100/80 transition flex items-center justify-center gap-1.5 cursor-pointer">
                 <FolderHeart className="w-4 h-4" /> Save Draft
               </button>

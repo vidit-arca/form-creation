@@ -53,13 +53,13 @@ export function ProjectDashboard() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-slate-200 border-t-blue-600"></div>
     </div>
   );
 
   if (!project) return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-slate-700">Project Not Found</h2>
         <Link to="/" className="text-blue-600 mt-4 inline-block hover:underline">← Back to Projects</Link>
@@ -77,12 +77,17 @@ export function ProjectDashboard() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition">
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25 ring-1 ring-blue-500/10">
                 <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent tracking-tight">HaloFormCraft</span>
+              <div className="flex flex-col leading-none gap-0.5">
+                <span className="text-[18px] font-extrabold tracking-tight">
+                  <span className="bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-600 bg-clip-text text-transparent">Halo</span><span className="text-slate-800 ml-0.5">Form<span className="ml-[2px]">Craft</span></span>
+                </span>
+                <span className="text-[9.5px] font-medium text-slate-400 tracking-[0.06em] uppercase">Admin Platform</span>
+              </div>
             </Link>
             {/* Breadcrumb */}
             <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
@@ -195,8 +200,29 @@ export function ProjectDashboard() {
                   const printArea = document.getElementById('qr-print-area');
                   if (!printArea) return;
                   const w = window.open('', '_blank');
-                  w.document.write(`<html><head><title>QR Codes — ${project.name}</title><style>body{font-family:Inter,system-ui,sans-serif;padding:40px;}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;}.card{text-align:center;border:1px solid #e2e8f0;border-radius:16px;padding:24px;}.card h4{margin:12px 0 4px;font-size:14px;}.card .code{font-family:monospace;color:#4f46e5;background:#eef2ff;padding:2px 8px;border-radius:4px;font-size:12px;display:inline-block;}.card .url{font-size:9px;color:#94a3b8;word-break:break-all;margin-top:8px;}.badge{display:inline-block;background:#dcfce7;color:#166534;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;margin-top:4px;}@media print{body{padding:20px;}.grid{gap:20px;}}</style></head><body><h1 style="margin-bottom:8px">${project.name}</h1><p style="color:#64748b;font-size:13px;margin-bottom:24px">Permanent QR Codes — No expiry, unlimited scans</p>${printArea.innerHTML}</body></html>`);
-                  w.document.close();
+                  if (!w) return;
+
+                  const doc = w.document;
+                  // textContent is safe — no HTML injection possible
+                  doc.title = `QR Codes — ${project.name}`;
+
+                  const style = doc.createElement('style');
+                  style.textContent = `body{font-family:Inter,system-ui,sans-serif;padding:40px;}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;}.card{text-align:center;border:1px solid #e2e8f0;border-radius:16px;padding:24px;}.card h4{margin:12px 0 4px;font-size:14px;}.card .code{font-family:monospace;color:#4f46e5;background:#eef2ff;padding:2px 8px;border-radius:4px;font-size:12px;display:inline-block;}.card .url{font-size:9px;color:#94a3b8;word-break:break-all;margin-top:8px;}.badge{display:inline-block;background:#dcfce7;color:#166534;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;margin-top:4px;}@media print{body{padding:20px;}.grid{gap:20px;}}`;
+                  doc.head.appendChild(style);
+
+                  const h1 = doc.createElement('h1');
+                  h1.style.marginBottom = '8px';
+                  h1.textContent = project.name;           // textContent = no XSS
+                  doc.body.appendChild(h1);
+
+                  const sub = doc.createElement('p');
+                  sub.style.cssText = 'color:#64748b;font-size:13px;margin-bottom:24px';
+                  sub.textContent = 'Permanent QR Codes — No expiry, unlimited scans';
+                  doc.body.appendChild(sub);
+
+                  // cloneNode instead of .innerHTML round-tripping
+                  doc.body.appendChild(printArea.cloneNode(true));
+
                   w.print();
                 }}
                 className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700 shadow-sm hover:shadow-md transition-all active:scale-95 flex-shrink-0"
@@ -379,9 +405,16 @@ export function ProjectDashboard() {
 
       {/* ─── Footer ─── */}
       <div className="border-t border-slate-200/60 bg-white/40 backdrop-blur-sm mt-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6 flex items-center justify-between text-sm text-slate-400">
-          <span>HaloFormCraft Admin Panel</span>
-          <span>Built with React + FastAPI</span>
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-md flex items-center justify-center">
+              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            </div>
+            <span className="text-sm font-semibold"><span className="bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">Halo</span><span className="text-slate-600 ml-0.5">Form<span className="ml-[2px]">Craft</span></span></span>
+            <span className="text-slate-300 text-xs">·</span>
+            <span className="text-xs text-slate-400">Admin Panel</span>
+          </div>
+          <span className="text-xs text-slate-400">Built with React + FastAPI</span>
         </div>
       </div>
     </div>

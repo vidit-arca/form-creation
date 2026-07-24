@@ -14,8 +14,17 @@ export const syncPendingSubmissions = async () => {
   for (const submission of pendingOrFailed) {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-      // If there is a targetUrl specified (from FormRenderer), use it, otherwise fallback
-      const endpointUrl = submission.targetUrl || `${API_URL}/patient/forms/${submission.formId}/submissions`;
+
+      // Security: never trust a URL stored in the submission object.
+      // Validate formId is a safe integer and derive the endpoint from it.
+      if (!Number.isInteger(submission.formId)) {
+        await updateSubmission(submission.id, {
+          syncStatus: 'FAILED',
+          errorMessage: 'Invalid formId — submission skipped',
+        });
+        continue;
+      }
+      const endpointUrl = `${API_URL}/patient/forms/${submission.formId}/submissions`;
 
       const response = await fetch(endpointUrl, {
         method: 'POST',
