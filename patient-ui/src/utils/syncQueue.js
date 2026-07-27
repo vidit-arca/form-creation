@@ -17,14 +17,15 @@ export const syncPendingSubmissions = async () => {
 
       // Security: never trust a URL stored in the submission object.
       // Validate formId is a safe integer and derive the endpoint from it.
-      if (!Number.isInteger(submission.formId)) {
+      const numericFormId = parseInt(submission.formId, 10);
+      if (isNaN(numericFormId) || numericFormId <= 0) {
         await updateSubmission(submission.id, {
           syncStatus: 'FAILED',
           errorMessage: 'Invalid formId — submission skipped',
         });
         continue;
       }
-      const endpointUrl = `${API_URL}/patient/forms/${submission.formId}/submissions`;
+      const endpointUrl = `${API_URL}/patient/forms/${numericFormId}/submissions`;
 
       const response = await fetch(endpointUrl, {
         method: 'POST',

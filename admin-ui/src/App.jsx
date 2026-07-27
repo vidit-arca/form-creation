@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ProjectList } from './pages/ProjectList';
 import { ProjectDashboard } from './pages/ProjectDashboard';
 import { HospitalManager } from './pages/HospitalManager';
@@ -25,6 +25,10 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/builder/:id" element={<FormBuilder />} />
         <Route path="/responses/:id" element={<Responses />} />
+
+        {/* CATCH-ALL / REDIRECTS — Redirect /admin or unknown routes to Home page */}
+        <Route path="/admin/*" element={<Navigate replace to="/" />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>
     </Router>
   );

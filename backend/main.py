@@ -11,6 +11,14 @@ import datetime
 
 models.Base.metadata.create_all(bind=engine)
 
+# Automatically seed default users if database is fresh/empty
+with Session(engine) as db:
+    if not db.query(models.User).filter_by(id=1).first():
+        db.add(models.User(id=1, username="admin", role="ADMIN", password_hash="hashed_admin_pwd"))
+    if not db.query(models.User).filter_by(id=2).first():
+        db.add(models.User(id=2, username="patient", role="PATIENT", password_hash="hashed_patient_pwd"))
+    db.commit()
+
 app = FastAPI(title="Dynamic Form API")
 
 app.add_middleware(

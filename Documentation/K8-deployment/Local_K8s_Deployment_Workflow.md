@@ -30,28 +30,27 @@ kubectl apply -f k8s/01-haloform-prod.yaml
 # kubectl create namespace haloform-prod
 ```
 
-### Step 2 & 3: Build Docker Images Locally
+### Step 2 & 3: Build, Push, & Update Docker Images
 
-Since the deployment target is a local cluster, we build the images directly on the node. The Kubernetes deployment YAMLs are configured with `imagePullPolicy: IfNotPresent`, meaning Kubernetes will utilize these locally built images without requiring a push to Docker Hub or an external registry.
-
-> **Note for Multi-Node Clusters:** If the local cluster consists of multiple physical worker nodes, you must either build these images on *every* worker node, or push them to a local private registry (e.g., `localhost:5000`) and update the image tags in the YAML files accordingly.
+The Kubernetes deployment YAMLs in `halo_k8s` use `imagePullPolicy: Always` with the `viditk03/` image prefix.
 
 Run these commands from the root directory (`/Users/apple/Desktop/form-creation`):
 
 ```bash
-# 1. Build the FastAPI Backend
-docker build -t haloform-backend:latest ./backend
+# 1. Build & Push Admin UI
+docker build -t viditk03/haloform-admin-ui:latest --build-arg VITE_API_URL=/api ./admin-ui
+docker push viditk03/haloform-admin-ui:latest
+kubectl rollout restart deployment admin-ui -n haloform-prod
 
-# 2. Build the Admin UI (Vite + React)
-# Note: VITE_API_URL is injected so the frontend knows how to reach the backend via the Gateway
-docker build -t haloform-admin-ui:latest \
-  --build-arg VITE_API_URL=/api \
-  ./admin-ui
+# 2. Build & Push Patient UI
+docker build -t viditk03/haloform-patient-ui:latest --build-arg VITE_API_URL=/api ./patient-ui
+docker push viditk03/haloform-patient-ui:latest
+kubectl rollout restart deployment patient-ui -n haloform-prod
 
-# 3. Build the Patient UI (Vite + React)
-docker build -t haloform-patient-ui:latest \
-  --build-arg VITE_API_URL=/api \
-  ./patient-ui
+# 3. Build & Push Backend API
+docker build -t viditk03/haloform-backend:latest ./backend
+docker push viditk03/haloform-backend:latest
+kubectl rollout restart deployment backend -n haloform-prod
 ```
 
 ### Step 4 & 5: Apply Kubernetes Configurations & Deployments
@@ -124,3 +123,9 @@ cloudflared tunnel --url http://localhost:30080
 ```
 
 This will instantly generate a secure, public HTTPS link (e.g., `https://random-words.trycloudflare.com`) that routes directly to your NodePort. You can confidently share this link with external clients for secure remote access.
+
+---
+
+### 5. Troubleshooting & Complete Guide
+For detailed debugging of CORS issues, Gateway architecture, background `nohup` tunnels, and database user seeding, see our full guide:
+👉 **[Kubernetes & Cloudflare Tunnel Troubleshooting Guide](file:///Users/apple/Desktop/form-creation/Documentation/K8-deployment/K8s_Cloudflare_Troubleshooting_and_Access_Guide.md)**
