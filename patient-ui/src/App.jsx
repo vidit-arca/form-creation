@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useParams, useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useForm, useWatch, Controller } from 'react-hook-form';
 import SignatureCanvas from 'react-signature-canvas';
 import { QRScannerComponent } from './components/QRScannerComponent';
@@ -18,6 +18,7 @@ import { NetworkStatusBanner } from './components/NetworkStatusBanner';
 import { SubmissionHistory as OfflineHistory } from './components/SubmissionHistory';
 import { SavedDrafts } from './components/SavedDrafts';
 import { IntakeForm } from './components/IntakeForm';
+import { DietaryRecallField } from './components/DietaryRecallField';
 
 const reactSelectPatientStyles = {
   control: (base, state) => ({
@@ -349,7 +350,7 @@ function evaluateLogic(logic, formValues) {
   }
 
   const ruleResults = validRules.map(rule => {
-    const depVal = formValues[rule.fieldId];
+    const depVal = formValues?.[rule.fieldId];
     const targetVal = rule.value;
     const op = rule.operator || '==';
 
@@ -403,6 +404,36 @@ function evaluateLogic(logic, formValues) {
   return { isVisible, isRequired };
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught error:", error, errorInfo);
+    this.setState({ errorInfo });
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 max-w-2xl mx-auto font-sans">
+          <div className="bg-red-50 border border-red-200 text-red-800 p-6 rounded-2xl">
+            <h2 className="text-xl font-bold mb-2">Form Render Error</h2>
+            <p className="text-sm mb-4">{this.state.error?.toString()}</p>
+            <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function FormRenderer() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -411,9 +442,10 @@ function FormRenderer() {
   const [formConfig, setFormConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [isReviewMode, setIsReviewMode] = useState(false);
   const navigate = useNavigate();
 
-  const { register, handleSubmit, control, trigger, setValue, getValues, reset, formState: { errors } } = useForm();
+  const { register, handleSubmit, control, trigger, setValue, getValues, watch, reset, formState: { errors } } = useForm();
   const formValues = useWatch({ control });
 
   // Filters options based on optionConditions config (e.g. GDM only for Female)
@@ -447,6 +479,41 @@ function FormRenderer() {
       alert("Error saving draft. Please try again.");
     }
   };
+
+  // ── Auto-save: silently persist form values every 30 seconds ──────────────
+  // This protects against device power-off or browser crashes mid-fill.
+  // It always overwrites the same draft ID so no duplicate drafts are created.
+  const [autoSaveStatus, setAutoSaveStatus] = useState(null); // null | 'saving' | 'saved'
+
+  useEffect(() => {
+    if (!formConfig) return; // Don't start until form schema is loaded
+
+    const interval = setInterval(async () => {
+      try {
+        const currentValues = getValues();
+        // Only auto-save if the user has actually entered something
+        const hasData = Object.values(currentValues).some(
+          (v) => v !== undefined && v !== null && v !== ''
+        );
+        if (!hasData) return;
+
+        setAutoSaveStatus('saving');
+        const formTitle = formConfig?.title || 'Unknown Form';
+        const savedId = await saveDraft(activeDraftId, id, formTitle, currentValues);
+        setActiveDraftId(savedId); // keep ID stable so we overwrite, not duplicate
+        setAutoSaveStatus('saved');
+
+        // Clear the "saved" indicator after 3 seconds
+        setTimeout(() => setAutoSaveStatus(null), 3000);
+      } catch (err) {
+        console.error('[Auto-save] Failed to save draft:', err);
+        setAutoSaveStatus(null);
+      }
+    }, 30_000); // every 30 seconds
+
+    return () => clearInterval(interval); // clean up on unmount
+  }, [formConfig, id, activeDraftId, getValues]);
+
 
   useEffect(() => {
     const loadForm = async () => {
@@ -525,7 +592,7 @@ function FormRenderer() {
 
         // Evaluate Exclusive Stop Criteria
         if (field.enableExclusiveStop && field.exclusiveStopOptions?.length > 0) {
-          const val = formValues[field.id];
+          const val = formValues?.[field.id];
           if (val !== undefined && val !== null && val !== '') {
             if (Array.isArray(val)) {
               if (val.some(v => field.exclusiveStopOptions.includes(v))) {
@@ -552,6 +619,13 @@ function FormRenderer() {
     return { pages: filteredPages, isTerminated: terminated };
   }, [formConfig, formValues]);
 
+  // Clamp currentPageIndex if filtered pages change
+  useEffect(() => {
+    if (pages.length > 0 && currentPageIndex >= pages.length) {
+      setCurrentPageIndex(Math.max(0, pages.length - 1));
+    }
+  }, [pages.length, currentPageIndex]);
+
   const slugify = (text) => {
     if (!text) return "";
     return text
@@ -572,6 +646,18 @@ function FormRenderer() {
         window.scrollTo(0, 0);
       }
       return; // Do not submit yet
+    }
+
+    // If on the last page and NOT in review mode, switch to review mode
+    if (!isReviewMode) {
+      const currentFields = pages[currentPageIndex]?.fields || [];
+      const currentPageFieldIds = currentFields.map(f => f.id);
+      const isPageValid = await trigger(currentPageFieldIds);
+      if (isPageValid) {
+        setIsReviewMode(true);
+        window.scrollTo(0, 0);
+      }
+      return;
     }
 
     // Prepare data for submission: Use variableName, or Slugify Label, fallback to ID
@@ -675,6 +761,11 @@ function FormRenderer() {
   };
 
   const handlePrevPage = () => {
+    if (isReviewMode) {
+      setIsReviewMode(false);
+      window.scrollTo(0, 0);
+      return;
+    }
     setCurrentPageIndex(curr => Math.max(0, curr - 1));
     window.scrollTo(0, 0);
   };
@@ -685,7 +776,7 @@ function FormRenderer() {
   const totalPages = pages.length;
 
   return (
-    <div className="p-8 max-w-2xl mx-auto font-sans">
+    <div className="p-8 max-w-6xl mx-auto font-sans">
       <Link to="/" className="text-gray-500 hover:text-gray-800 mb-6 inline-block">← Back to Forms</Link>
 
       <div className="bg-white shadow-lg rounded-2xl overflow-hidden border border-gray-100">
@@ -707,8 +798,65 @@ function FormRenderer() {
           )}
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-8 space-y-6">
-          {currentFields.map(field => {
+        <form onSubmit={handleSubmit(onSubmit)} className="p-8 flex flex-wrap -mx-3">
+          {isReviewMode ? (
+            <div className="w-full px-3 mb-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-2">Review Your Answers</h2>
+              <div className="space-y-6">
+                {pages.map((page, pIdx) => {
+                  const visibleFields = page.fields.filter(f => {
+                    const logicRes = evaluateLogic(f.logic, formValues);
+                    return logicRes.isVisible;
+                  });
+                  if (visibleFields.length === 0) return null;
+                  
+                  return (
+                    <div key={pIdx} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                      <h3 className="text-lg font-semibold text-green-700 mb-4">{page.title || `Section ${pIdx + 1}`}</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6">
+                        {visibleFields.map(field => {
+                          if (['page_break', 'section_header', 'instruction', 'divider'].includes(field.type)) return null;
+                          let val = getValues(field.id);
+                          
+                          // Format value for display
+                          let displayVal = val;
+                          if (val === undefined || val === null || val === '') {
+                             displayVal = <span className="text-gray-400 italic">Not provided</span>;
+                          } else if (typeof val === 'boolean') {
+                             displayVal = val ? 'Yes' : 'No';
+                          } else if (Array.isArray(val)) {
+                             displayVal = val.length > 0 ? val.join(', ') : <span className="text-gray-400 italic">None selected</span>;
+                          } else if (field.type === 'signature') {
+                             displayVal = val ? <img src={val} alt="Signature" className="h-16 border rounded bg-white" /> : <span className="text-gray-400 italic">Not signed</span>;
+                          } else if (field.type === 'image') {
+                             displayVal = val ? <img src={val} alt="Uploaded" className="h-20 rounded" /> : <span className="text-gray-400 italic">No image</span>;
+                          } else if (field.type === 'dietary_recall_24h' && typeof val === 'object') {
+                             displayVal = Object.entries(val).filter(([_, items]) => items && items.length > 0).map(([meal, items]) => (
+                               <div key={meal} className="mb-2">
+                                 <strong className="text-sm">{meal}:</strong>
+                                 <ul className="list-disc list-inside text-sm pl-2">
+                                   {items.map((item, i) => <li key={i}>{typeof item === 'string' ? item : item.name}</li>)}
+                                 </ul>
+                               </div>
+                             ));
+                             if (!displayVal.length) displayVal = <span className="text-gray-400 italic">No items recorded</span>;
+                          }
+                          
+                          return (
+                            <div key={field.id} className="flex flex-col">
+                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{field.label}</span>
+                              <div className="text-gray-800 font-medium mt-1">{displayVal}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            currentFields.map(field => {
             let isRequired = field.required;
             let isVisible = true;
 
@@ -723,7 +871,13 @@ function FormRenderer() {
             if (field.validation) {
               if (field.validation.minLength) validationRules.minLength = { value: parseInt(field.validation.minLength), message: `Minimum ${field.validation.minLength} characters` };
               if (field.validation.maxLength) validationRules.maxLength = { value: parseInt(field.validation.maxLength), message: `Maximum ${field.validation.maxLength} characters` };
-              if (field.validation.pattern) validationRules.pattern = { value: new RegExp(field.validation.pattern), message: "Invalid format" };
+              if (field.validation.pattern) {
+                try {
+                  validationRules.pattern = { value: new RegExp(field.validation.pattern), message: "Invalid format" };
+                } catch (e) {
+                  console.warn("Invalid regex pattern:", field.validation.pattern);
+                }
+              }
               if (field.validation.min) validationRules.min = { value: Number(field.validation.min), message: `Minimum value is ${field.validation.min}` };
               if (field.validation.max) validationRules.max = { value: Number(field.validation.max), message: `Maximum value is ${field.validation.max}` };
 
@@ -766,9 +920,20 @@ function FormRenderer() {
             }
 
             const isLayout = ['section_header', 'instruction', 'divider'].includes(field.type);
+            const isDefaultFullWidth = ['section_header', 'instruction', 'divider', 'textarea', 'file', 'image', 'signature', 'cohort_input', 'dietary_recall_24h'].includes(field.type);
+
+            let widthClass = 'w-full md:w-1/2';
+            if (field.width === 'full' || (!field.width && isDefaultFullWidth)) {
+              widthClass = 'w-full';
+            } else if (field.width === 'half') {
+              widthClass = 'w-full md:w-1/2';
+            } else if (field.width === 'third') {
+              widthClass = 'w-full md:w-1/3';
+            }
 
             return (
-              <div key={field.id} className={`flex flex-col ${isLayout ? '' : 'bg-gray-50 p-5 rounded-xl border border-gray-100'}`}>
+              <div key={field.id} className={`px-3 mb-6 ${widthClass}`}>
+                <div className={`flex flex-col h-full ${isLayout ? '' : 'bg-gray-50 p-5 rounded-xl border border-gray-100'}`}>
                 {!isLayout && (
                   <>
                     <label className="font-semibold text-gray-800 mb-1 flex items-center text-lg">
@@ -1236,19 +1401,46 @@ function FormRenderer() {
                 {field.type === 'instruction' && <p className="text-gray-700 bg-blue-50 p-5 rounded-xl border border-blue-100 text-[15px] leading-relaxed">{field.description}</p>}
                 {field.type === 'divider' && <hr className="border-gray-200 my-6 border-t-2" />}
 
+                {field.type === 'dietary_recall_24h' && (
+                  <DietaryRecallField
+                    field={field}
+                    value={watch(field.id)}
+                    onChange={(val) => setValue(field.id, val, { shouldValidate: true })}
+                  />
+                )}
+
                 {errors[field.id] && <span className="text-red-500 text-sm mt-2 flex items-center gap-1 font-medium"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> {errors[field.id].message}</span>}
+                </div>
               </div>
             );
-          })}
+          })
+          )}
 
           {isTerminated && (
-            <div className="mt-8 bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl flex items-center justify-center gap-3">
+            <div className="w-full px-3 mt-8 bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl flex items-center justify-center gap-3">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               <span className="font-semibold text-[15px]">Form completed based on responses.</span>
             </div>
           )}
 
-          <div className="pt-6 border-t border-gray-100 mt-8 flex flex-col sm:flex-row justify-between gap-4">
+          {/* Auto-save status indicator */}
+          {autoSaveStatus && (
+            <div className={`w-full px-3 flex items-center gap-2 text-xs font-semibold transition-all duration-500 ${autoSaveStatus === 'saved' ? 'text-emerald-600' : 'text-amber-500'}`}>
+              {autoSaveStatus === 'saving' ? (
+                <>
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                  Auto-saving draft…
+                </>
+              ) : (
+                <>
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  Draft auto-saved ✓
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="w-full px-3 pt-6 border-t border-gray-100 mt-8 flex flex-col sm:flex-row justify-between gap-4">
             <div className="flex gap-2 flex-1">
               {currentPageIndex > 0 ? (
                 <button type="button" onClick={handlePrevPage} className="flex-1 bg-slate-100 text-slate-700 px-4 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
@@ -1265,8 +1457,8 @@ function FormRenderer() {
               </button>
             </div>
 
-            <button type="submit" className={`flex-1 text-white px-6 py-3 rounded-xl font-bold text-md transition shadow-md hover:shadow-lg cursor-pointer ${isTerminated ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-              {isTerminated ? 'End & Submit Form' : (currentPageIndex < totalPages - 1 ? 'Next' : 'Submit Form')}
+            <button type="submit" className={`flex-1 text-white px-6 py-3 rounded-xl font-bold text-md transition shadow-md hover:shadow-lg cursor-pointer ${isReviewMode ? 'bg-emerald-600 hover:bg-emerald-700' : (isTerminated ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700')}`}>
+              {isReviewMode ? 'Submit Form' : (isTerminated ? 'Review Form (Terminated)' : (currentPageIndex < totalPages - 1 ? 'Next' : 'Review Form'))}
             </button>
           </div>
         </form>
@@ -1326,10 +1518,11 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/forms" element={<Dashboard />} />
-        <Route path="/fill/:id" element={<FormRenderer />} />
+        <Route path="/fill/:id" element={<ErrorBoundary><FormRenderer /></ErrorBoundary>} />
         <Route path="/drafts" element={<SavedDrafts />} />
         <Route path="/history" element={<OfflineHistory />} />
-        <Route path="/demo" element={<IntakeForm />} />
+        <Route path="/admin/*" element={<Navigate replace to="/" />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>
     </Router>
   );
