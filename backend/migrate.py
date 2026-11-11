@@ -7,9 +7,11 @@ Migration Script: Adds new Project/Hospital tables and columns to existing forms
 """
 import sqlite3
 import sys
+import os
 from datetime import datetime, timezone
 
-DB_PATH = "./forms.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "forms.db")
 
 def migrate():
     conn = sqlite3.connect(DB_PATH)
@@ -58,6 +60,7 @@ def migrate():
     existing_sub_cols = {row[1] for row in cursor.execute("PRAGMA table_info(submissions)").fetchall()}
 
     new_sub_cols = {
+        "client_submission_id": "TEXT",
         "project_id": "INTEGER REFERENCES projects(id)",
         "hospital_id": "INTEGER REFERENCES hospitals(id)",
         "center_id": "TEXT",
@@ -69,6 +72,10 @@ def migrate():
             print(f"  ✅ Added '{col_name}' to submissions")
         else:
             print(f"  ⏭️  '{col_name}' already exists on submissions")
+
+    # Ensure unique index for client_submission_id
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_submissions_client_submission_id ON submissions(client_submission_id) WHERE client_submission_id IS NOT NULL")
+    print("  ✅ Unique index on 'client_submission_id' ready")
 
     # ── Step 5: Create default project for orphaned data ──
     cursor.execute("SELECT id FROM projects WHERE slug = 'GEN_DEFAULT'")

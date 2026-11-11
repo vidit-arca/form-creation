@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -162,6 +162,75 @@ def export_submissions(form_id: int, db: Session = Depends(get_db), admin=Depend
         headers={"Content-Disposition": f"attachment; filename=form_{form_id}_export.csv"}
     )
 
+@app.post("/api/admin/submissions/bulk-import")
+def bulk_import_submissions(
+    ledger: List[dict],
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin)
+):
+    """
+    Emergency Disaster Recovery: Ingest offline submissions ledger (JSON)
+    collected from field devices via USB or offline export.
+    Deduplicates via client_submission_id.
+    """
+    imported = 0
+    skipped = 0
+    errors = []
+
+    for idx, item in enumerate(ledger):
+        client_sub_id = item.get("client_submission_id") or item.get("id")
+        form_id = item.get("formId") or item.get("form_id")
+        payload = item.get("payload") or item.get("data") or {}
+        metadata = item.get("metadata") or {}
+
+        if not form_id:
+            errors.append(f"Row {idx+1}: Missing formId")
+            continue
+
+        # Check idempotency
+        if client_sub_id:
+            existing = db.query(models.Submission).filter(
+                models.Submission.client_submission_id == str(client_sub_id)
+            ).first()
+            if existing:
+                skipped += 1
+                continue
+
+        # Resolve published version
+        pub_v = db.query(models.FormVersion).filter(
+            models.FormVersion.form_id == int(form_id),
+            models.FormVersion.status == "PUBLISHED"
+        ).first()
+        if not pub_v:
+            errors.append(f"Row {idx+1}: Form {form_id} has no published version")
+            continue
+
+        db_sub = models.Submission(
+            client_submission_id=str(client_sub_id) if client_sub_id else None,
+            form_version_id=pub_v.id,
+            patient_id=admin.id,
+            data=payload,
+            project_id=metadata.get("projectId") or pub_v.form.project_id,
+            hospital_id=metadata.get("hospitalId"),
+            center_id=metadata.get("centerId"),
+            submitted_by=metadata.get("submittedBy") or "OFFLINE_IMPORT"
+        )
+        db.add(db_sub)
+        imported += 1
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
+
+    return {
+        "status": "success",
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors
+    }
+
 # ════════════════════════════════════════════════════════════════════════════════
 # EXISTING PATIENT ENDPOINTS — UPDATED WITH OPTIONAL CONTEXT FILTERING
 # ════════════════════════════════════════════════════════════════════════════════
@@ -227,9 +296,20 @@ def submit_form(
     project: Optional[str] = Query(None, description="Project slug for metadata tagging"),
     site: Optional[str] = Query(None, description="Hospital site code for metadata tagging"),
     center: Optional[str] = Query(None, description="Center/camp identifier"),
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
     db: Session = Depends(get_db),
     patient=Depends(get_current_patient)
 ):
+    idempotency_key = x_idempotency_key or submission.client_submission_id
+
+    # 1. Deduplication check: if submission with this UUID already exists, return it immediately (HTTP 200)
+    if idempotency_key:
+        existing_sub = db.query(models.Submission).filter(
+            models.Submission.client_submission_id == idempotency_key
+        ).first()
+        if existing_sub:
+            return existing_sub
+
     pub_v = db.query(models.FormVersion).filter(models.FormVersion.form_id == form_id, models.FormVersion.status == "PUBLISHED").first()
     if not pub_v:
         raise HTTPException(status_code=404, detail="Published form not found")
@@ -253,6 +333,7 @@ def submit_form(
             resolved_hospital_id = db_hospital.id
 
     db_sub = models.Submission(
+        client_submission_id=idempotency_key,
         form_version_id=pub_v.id,
         patient_id=patient.id,
         data=submission.data,
@@ -262,8 +343,20 @@ def submit_form(
         submitted_by=patient.username
     )
     db.add(db_sub)
-    db.commit()
-    db.refresh(db_sub)
+    try:
+        db.commit()
+        db.refresh(db_sub)
+    except Exception as e:
+        db.rollback()
+        # Concurrency safety: if another thread committed the same idempotency_key in parallel
+        if idempotency_key:
+            existing_sub = db.query(models.Submission).filter(
+                models.Submission.client_submission_id == idempotency_key
+            ).first()
+            if existing_sub:
+                return existing_sub
+        raise HTTPException(status_code=500, detail=f"Database error during submission: {str(e)}")
+
     return db_sub
 
 @app.get("/api/patient/submissions", response_model=List[schemas.Submission])

@@ -72,6 +72,7 @@ class FormVersion(Base):
 class Submission(Base):
     __tablename__ = "submissions"
     id = Column(Integer, primary_key=True, index=True)
+    client_submission_id = Column(String(36), unique=True, index=True, nullable=True) # Idempotency Key
     form_version_id = Column(Integer, ForeignKey("form_versions.id"))
     patient_id = Column(Integer, ForeignKey("users.id"))
     data = Column(JSON)

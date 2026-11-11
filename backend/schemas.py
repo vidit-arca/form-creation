@@ -44,9 +44,11 @@ class Form(FormBase):
 
 class SubmissionCreate(BaseModel):
     data: Dict[str, Any]
+    client_submission_id: Optional[str] = None
 
 class Submission(BaseModel):
     id: int
+    client_submission_id: Optional[str] = None
     form_version_id: int
     patient_id: int
     data: Dict[str, Any]
