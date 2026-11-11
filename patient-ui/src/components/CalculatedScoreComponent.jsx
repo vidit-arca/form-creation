@@ -167,29 +167,32 @@ export function CalculatedScoreComponent({ field, control, schemaData, onChange 
 
   const getBadgeColorClasses = (color) => {
     switch (color) {
-      case 'green': return 'bg-green-100 text-green-800 border-green-200';
-      case 'yellow': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'red': return 'bg-red-100 text-red-800 border-red-200';
-      case 'blue': return 'bg-blue-100 text-blue-800 border-blue-200';
-      default: return 'bg-gray-100 text-gray-500 border-gray-200';
+      case 'green': return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+      case 'yellow': return 'bg-amber-50 text-amber-800 border-amber-200';
+      case 'red': return 'bg-rose-50 text-rose-800 border-rose-200';
+      case 'blue': return 'bg-sky-50 text-sky-800 border-sky-200';
+      default: return 'bg-slate-100 text-slate-600 border-slate-200';
     }
   };
 
   return (
-    <div className="border border-gray-200 bg-blue-50 rounded-xl p-5 shadow-sm">
-      <div className="flex justify-between items-center">
+    <div className="border border-slate-200/90 bg-slate-50/60 rounded-xl p-4 sm:p-5 shadow-2xs font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-gray-800 font-bold">{field.label || 'Calculated Score'}</h3>
-          {field.description && <p className="text-sm text-gray-500 mt-1">{field.description}</p>}
+          <span className="font-mono text-[10.5px] font-bold text-teal-800 uppercase tracking-wider block mb-0.5">
+            Biometric Metric Engine
+          </span>
+          <h3 className="text-sm font-bold text-slate-900">{field.label || 'Calculated Score'}</h3>
+          {field.description && <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{field.description}</p>}
         </div>
-        <div className="flex items-center gap-4 bg-white px-5 py-3 rounded-lg border border-gray-200 shadow-sm">
-          <span className="text-3xl font-black text-gray-800">{totalScore}</span>
+        <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-lg border border-slate-200 shadow-2xs self-start sm:self-auto">
+          <span className="text-2xl font-mono font-black text-slate-950">{totalScore}</span>
           {activeBadge ? (
-            <span className={`px-4 py-1.5 rounded-full text-sm font-bold border uppercase tracking-wider ${getBadgeColorClasses(activeBadge.color)}`}>
+            <span className={`px-2.5 py-1 rounded font-mono text-xs font-bold border uppercase tracking-wider ${getBadgeColorClasses(activeBadge.color)}`}>
               {activeBadge.label}
             </span>
           ) : (
-            <span className="px-4 py-1.5 rounded-full text-sm font-bold border uppercase tracking-wider bg-gray-100 text-gray-400 border-gray-200">
+            <span className="px-2.5 py-1 rounded font-mono text-xs font-bold border uppercase tracking-wider bg-slate-100 text-slate-400 border-slate-200">
               --
             </span>
           )}

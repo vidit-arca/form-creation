@@ -9,7 +9,7 @@ import { Responses } from './pages/Responses';
 
 function App() {
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <Routes>
         {/* NEW — Project management pages (upstream of form flow) */}
         <Route path="/" element={<ProjectList />} />
@@ -26,8 +26,7 @@ function App() {
         <Route path="/builder/:id" element={<FormBuilder />} />
         <Route path="/responses/:id" element={<Responses />} />
 
-        {/* CATCH-ALL / REDIRECTS — Redirect /admin or unknown routes to Home page */}
-        <Route path="/admin/*" element={<Navigate replace to="/" />} />
+        {/* CATCH-ALL / REDIRECTS — Redirect unknown routes to Home page */}
         <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>
     </Router>

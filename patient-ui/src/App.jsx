@@ -13,7 +13,7 @@ import { HomePage } from './components/HomePage';
 import Select from 'react-select';
 import { addSubmissionToQueue, formCacheStore, saveDraft, getDraft, deleteDraft } from './utils/storage';
 import { NavBar } from './components/NavBar';
-import { Save, ChevronLeft, ArrowLeft, FolderHeart } from 'lucide-react';
+import { ChevronLeft, ArrowLeft, FolderHeart, Activity, Building2, ShieldCheck, ArrowRight, QrCode } from 'lucide-react';
 import { NetworkStatusBanner } from './components/NetworkStatusBanner';
 import { SubmissionHistory as OfflineHistory } from './components/SubmissionHistory';
 import { SavedDrafts } from './components/SavedDrafts';
@@ -23,33 +23,36 @@ import { DietaryRecallField } from './components/DietaryRecallField';
 const reactSelectPatientStyles = {
   control: (base, state) => ({
     ...base,
-    border: state.isFocused ? '2px solid #22c55e' : '1px solid #d1d5db',
-    boxShadow: 'none',
-    '&:hover': { border: state.isFocused ? '2px solid #22c55e' : '1px solid #d1d5db' },
+    border: state.isFocused ? '1px solid #0d9488' : '1px solid #cbd5e1',
+    boxShadow: state.isFocused ? '0 0 0 2px rgba(13, 148, 136, 0.15)' : 'none',
+    '&:hover': { border: state.isFocused ? '1px solid #0d9488' : '1px solid #94a3b8' },
     borderRadius: '0.5rem',
     padding: '2px',
+    fontSize: '0.875rem',
   }),
   option: (base, state) => ({
     ...base,
-    backgroundColor: state.isSelected ? '#16a34a' : state.isFocused ? '#f0fdf4' : 'white',
-    color: state.isSelected ? 'white' : '#374151',
+    backgroundColor: state.isSelected ? '#0f766e' : state.isFocused ? '#f0fdfa' : 'white',
+    color: state.isSelected ? 'white' : '#0f172a',
     cursor: 'pointer',
+    fontSize: '0.875rem',
   }),
   multiValue: (base) => ({
     ...base,
-    backgroundColor: '#dcfce7',
-    borderRadius: '0.25rem',
+    backgroundColor: '#ccfbf1',
+    borderRadius: '0.375rem',
   }),
   multiValueLabel: (base) => ({
     ...base,
-    color: '#166534',
+    color: '#115e59',
+    fontWeight: 600,
   }),
   multiValueRemove: (base) => ({
     ...base,
-    color: '#166534',
+    color: '#115e59',
     ':hover': {
-      backgroundColor: '#bbf7d0',
-      color: '#14532d',
+      backgroundColor: '#99f6e4',
+      color: '#134e4a',
     },
   }),
 };
@@ -65,21 +68,34 @@ function getSiteContext() {
 function ContextBanner({ context, onClear }) {
   if (!context || (!context.project && !context.site)) return null;
   return (
-    <div className="bg-white/80 backdrop-blur-sm border border-emerald-200/60 rounded-2xl p-4 mb-8 flex items-center justify-between">
+    <div className="bg-slate-900 text-white border border-slate-800 rounded-xl p-4 mb-6 shadow-xs flex items-center justify-between gap-4">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
-          <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" /></svg>
+        <div className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center text-teal-300">
+          <Building2 className="w-5 h-5" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-slate-800">
-            {context.site && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-xs font-bold mr-2">{context.site}</span>}
-            {context.project && <span className="text-slate-500 text-xs">Project: <strong className="text-slate-700">{context.project}</strong></span>}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-teal-300 font-bold">
+              Active Study Context
+            </span>
+            {context.site && (
+              <span className="bg-emerald-400 text-slate-950 px-2 py-0.5 rounded font-mono text-xs font-bold shadow-2xs">
+                SITE {context.site}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-300 mt-0.5 font-mono">
+            {context.project && `Project: ${context.project}`}
+            {context.center && ` · Station: ${context.center}`}
           </p>
-          {context.center && <p className="text-xs text-slate-400 mt-0.5">Center: {context.center}</p>}
         </div>
       </div>
-      <button onClick={onClear} className="text-xs text-slate-400 hover:text-red-500 transition px-2 py-1 rounded-lg hover:bg-red-50" title="Clear context">
-        ✕ Clear
+      <button
+        onClick={onClear}
+        className="text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/10 transition px-2.5 py-1.5 rounded-lg border border-white/10"
+        title="Clear context"
+      >
+        Clear Station Context
       </button>
     </div>
   );
@@ -186,142 +202,129 @@ function Dashboard() {
   const hasContext = context && (context.project || context.site);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
-
+    <div className="min-h-screen radiant-canvas font-sans text-slate-900 antialiased selection:bg-blue-100 selection:text-blue-900">
       {/* ─── Navigation ─── */}
       <NavBar />
 
-      <div className="max-w-5xl mx-auto px-6 py-10">
-
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {/* ─── Context Banner (shows when locked to a project/site) ─── */}
         <ContextBanner context={context} onClear={clearContext} />
 
-        {/* ─── Hero Section ─── */}
-        <div className="bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 rounded-2xl p-10 mb-10 shadow-xl shadow-emerald-600/10 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute -right-12 -top-12 w-64 h-64 bg-white rounded-full"></div>
-            <div className="absolute left-1/3 -bottom-20 w-80 h-80 bg-white rounded-full"></div>
-          </div>
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center ring-1 ring-white/30">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" />
-                  </svg>
-                </div>
-                <span className="text-white/90 text-sm font-bold tracking-wide"><span className="font-extrabold text-white">Halo</span><span className="ml-0.5">Health<span className="ml-[2px]">Forms</span></span></span>
-              </div>
-              <span className="text-emerald-200 text-sm font-semibold">{forms.length} Form{forms.length !== 1 ? 's' : ''} Available</span>
+        {/* ─── Clinical Header ─── */}
+        <div className="radiant-card rounded-2xl p-6 sm:p-8 mb-8 relative overflow-hidden">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-teal-50 text-teal-800 text-xs font-bold mb-3 border border-teal-200/70 font-mono">
+              <Activity className="w-3.5 h-3.5 text-teal-700" />
+              <span>PROTOCOL_CATALOG_ACTIVE</span>
             </div>
-            
-            <div className="mb-3">
-              <span className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm text-emerald-100 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-white/20">
-                <span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span>
-                Health(Care) Assessment &amp; Lifestyle Operating Tool
+            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950">
+                Assigned Clinical Questionnaires
+              </h1>
+              <span className="font-mono text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200/60 self-start sm:self-auto">
+                {forms.length} {forms.length === 1 ? 'Protocol' : 'Protocols'} Available
               </span>
             </div>
-            
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">Welcome to Your<br />Health Portal</h1>
-            <p className="text-emerald-100 mt-3 text-lg max-w-lg leading-relaxed">Complete the forms below to share your health information securely with your care provider.</p>
+            <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+              Select an authorized case record instrument to begin clinical observation intake. Forms completed in offline stations are stored locally and encrypted.
+            </p>
           </div>
         </div>
 
         {/* ─── Forms Grid ─── */}
         {context === null ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-emerald-200 border-t-emerald-600"></div>
+          <div className="flex flex-col items-center justify-center py-24 gap-3 radiant-card rounded-2xl">
+            <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-teal-600 animate-spin" />
+            <span className="font-mono text-xs text-slate-500">Querying study protocol index...</span>
           </div>
         ) : !hasContext ? (
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-16 text-center shadow-sm">
-            <div className="w-20 h-20 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
-              <svg className="w-10 h-10 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-              </svg>
+          <div className="radiant-card rounded-2xl p-12 sm:p-16 text-center">
+            <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center mx-auto mb-4 text-amber-600">
+              <QrCode className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-bold text-slate-700 mb-2">Scan QR Code First</h3>
-            <p className="text-slate-500 max-w-sm mx-auto mb-6">Please scan the QR code at your hospital or center to view the forms assigned to you.</p>
-            <Link to="/" className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all active:scale-95">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
-              Go to Scanner
+            <h3 className="text-base font-bold text-slate-900 mb-1">Scan Station QR Code</h3>
+            <p className="text-sm text-slate-500 max-w-sm mx-auto mb-6">
+              Please scan the optical QR badge at your assigned study station or clinical site to unlock your protocol forms.
+            </p>
+            <Link
+              to="/"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold hover:bg-slate-800 transition shadow-xs active:translate-y-[1px]"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Launch Station Scanner</span>
             </Link>
           </div>
         ) : loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-emerald-200 border-t-emerald-600"></div>
+          <div className="flex flex-col items-center justify-center py-24 gap-3 radiant-card rounded-2xl">
+            <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-teal-600 animate-spin" />
+            <span className="font-mono text-xs text-slate-500">Loading assigned questionnaires...</span>
           </div>
         ) : forms.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-16 text-center shadow-sm">
-            <div className="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
-              <svg className="w-10 h-10 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+          <div className="radiant-card rounded-2xl p-12 sm:p-16 text-center">
+            <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-slate-400">
+              <Activity className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-bold text-slate-700 mb-2">No Forms Available</h3>
-            <p className="text-slate-500 max-w-sm mx-auto">There are currently no published forms to fill out. Please check back later or contact your provider.</p>
+            <h3 className="text-base font-bold text-slate-900 mb-1">No Published Protocols Assigned</h3>
+            <p className="text-sm text-slate-500 max-w-sm mx-auto">
+              There are currently no active questionnaires attached to this study site. Please verify site assignment with the coordinating investigator.
+            </p>
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2">
-            {forms.map((form, index) => {
-              const colors = [
-                { bg: 'from-emerald-400 to-teal-500', light: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200/60', hover: 'hover:border-emerald-300' },
-                { bg: 'from-blue-400 to-indigo-500', light: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200/60', hover: 'hover:border-blue-300' },
-                { bg: 'from-violet-400 to-purple-500', light: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200/60', hover: 'hover:border-violet-300' },
-                { bg: 'from-amber-400 to-orange-500', light: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200/60', hover: 'hover:border-amber-300' },
-              ];
-              const c = colors[index % colors.length];
-
-              return (
-                <div key={form.id} className={`group bg-white rounded-2xl border ${c.border} shadow-sm hover:shadow-lg ${c.hover} transition-all duration-300 overflow-hidden flex flex-col`}>
-                  {/* Color accent bar */}
-                  <div className={`h-1.5 bg-gradient-to-r ${c.bg}`}></div>
-
-                  <div className="p-7 flex flex-col flex-1">
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${c.bg} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-lg text-slate-900 group-hover:text-emerald-700 transition-colors leading-snug">{form.title}</h3>
-                        <p className="text-slate-500 text-sm mt-1 line-clamp-2 leading-relaxed">{form.description || 'Complete this form to share your information with your care provider.'}</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-auto pt-4">
-                      <Link
-                        to={`/fill/${form.id}`}
-                        className={`w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r ${c.bg} text-white px-6 py-3 rounded-xl font-bold text-[15px] shadow-md hover:shadow-lg transition-all active:scale-[0.98] hover:brightness-110`}
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Start Filling
-                      </Link>
-                    </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {forms.map((form) => (
+              <div
+                key={form.id}
+                className="radiant-card rounded-xl p-6 transition flex flex-col justify-between group hover:border-teal-300"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200/60 uppercase">
+                      Protocol #{form.id}
+                    </span>
+                    <span className="font-mono text-xs text-slate-400">
+                      STATUS: ACTIVE
+                    </span>
                   </div>
+                  <h3 className="font-bold text-lg text-slate-950 group-hover:text-teal-700 transition-colors leading-snug">
+                    {form.title}
+                  </h3>
+                  <p className="text-slate-600 text-xs mt-2 line-clamp-3 leading-relaxed">
+                    {form.description || 'Clinical observation and participant telemetry instrument.'}
+                  </p>
                 </div>
-              );
-            })}
+
+                <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <span className="font-mono text-[11px] text-slate-400">
+                    Ready for intake
+                  </span>
+                  <Link
+                    to={`/fill/${form.id}`}
+                    className="inline-flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-lg font-bold text-xs shadow-xs transition active:translate-y-[1px]"
+                  >
+                    <span>Start Questionnaire</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         )}
-      </div>
+      </main>
 
-      {/* ─── Footer ─── */}
-      <div className="border-t border-emerald-100/60 bg-white/40 backdrop-blur-sm mt-16">
-        <div className="max-w-5xl mx-auto px-6 py-6 flex items-center justify-between">
+      {/* ─── Clinical Footer ─── */}
+      <footer className="border-t border-slate-200/80 bg-white/60 mt-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-mono">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-md flex items-center justify-center">
-              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" /></svg>
-            </div>
-            <span className="text-sm font-semibold"><span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">Halo</span><span className="text-slate-600 ml-0.5">Health<span className="ml-[2px]">Forms</span></span></span>
-            <span className="text-slate-300 text-xs">·</span>
-            <span className="text-xs text-slate-400">Patient Portal</span>
+            <span className="font-bold text-slate-900">HaloHealthForms</span>
+            <span>·</span>
+            <span>Clinical Workstation Terminal</span>
           </div>
-          <span className="text-xs text-slate-400">Your data is secure &amp; confidential</span>
+          <div className="flex items-center gap-1.5 text-teal-800">
+            <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+            <span>End-to-End Encrypted Patient Vault</span>
+          </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
@@ -419,12 +422,24 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-8 max-w-2xl mx-auto font-sans">
-          <div className="bg-red-50 border border-red-200 text-red-800 p-6 rounded-2xl">
-            <h2 className="text-xl font-bold mb-2">Form Render Error</h2>
-            <p className="text-sm mb-4">{this.state.error?.toString()}</p>
-            <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">
-              Reload Page
+        <div className="min-h-screen bg-slate-50/60 p-6 sm:p-12 flex items-center justify-center font-sans">
+          <div className="bg-white border border-rose-200 text-slate-900 p-6 sm:p-8 rounded-2xl shadow-xs max-w-lg w-full">
+            <div className="flex items-center gap-2 text-rose-700 font-mono text-xs font-bold uppercase tracking-wider mb-2">
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              <span>SCHEMA_RENDER_EXCEPTION</span>
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-slate-950 mb-2">Clinical Protocol Display Error</h2>
+            <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+              An unexpected condition interrupted the layout rendering engine. The error telemetry has been logged:
+            </p>
+            <div className="bg-slate-950 text-rose-300 p-3 rounded-lg text-xs font-mono mb-6 overflow-x-auto">
+              {this.state.error?.toString()}
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-xs active:translate-y-[1px]"
+            >
+              Reinitialize Terminal Viewport
             </button>
           </div>
         </div>
@@ -485,6 +500,31 @@ function FormRenderer() {
   // It always overwrites the same draft ID so no duplicate drafts are created.
   const [autoSaveStatus, setAutoSaveStatus] = useState(null); // null | 'saving' | 'saved'
 
+  // 500ms debounced auto-save on active keystrokes / input modifications
+  useEffect(() => {
+    if (!formConfig || !formValues) return;
+    const hasData = Object.values(formValues).some(
+      (v) => v !== undefined && v !== null && v !== ''
+    );
+    if (!hasData) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        setAutoSaveStatus('saving');
+        const formTitle = formConfig?.title || 'Unknown Form';
+        const savedId = await saveDraft(activeDraftId, id, formTitle, formValues);
+        setActiveDraftId(savedId);
+        setAutoSaveStatus('saved');
+        setTimeout(() => setAutoSaveStatus(null), 2500);
+      } catch (err) {
+        console.warn('[Auto-save] 500ms debounced auto-save failed:', err);
+        setAutoSaveStatus(null);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [formValues, formConfig, id, activeDraftId]);
+
   useEffect(() => {
     if (!formConfig) return; // Don't start until form schema is loaded
 
@@ -512,6 +552,26 @@ function FormRenderer() {
     }, 30_000); // every 30 seconds
 
     return () => clearInterval(interval); // clean up on unmount
+  }, [formConfig, id, activeDraftId, getValues]);
+
+  // Emergency auto-save listener on tab-close or navigation
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        const currentValues = getValues();
+        const hasData = Object.values(currentValues).some(
+          (v) => v !== undefined && v !== null && v !== ''
+        );
+        if (hasData) {
+          const formTitle = formConfig?.title || 'Unknown Form';
+          saveDraft(activeDraftId, id, formTitle, currentValues);
+        }
+      } catch (err) {
+        console.warn('[Auto-save] Emergency beforeunload save failed:', err);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [formConfig, id, activeDraftId, getValues]);
 
 
@@ -713,7 +773,10 @@ function FormRenderer() {
       const metaQuery = metaParams.toString();
       const submitUrl = `${API_URL}/patient/forms/${id}/submissions${metaQuery ? '?' + metaQuery : ''}`;
 
+      const clientSubmissionId = crypto.randomUUID();
+
       const finalPayload = {
+        id: clientSubmissionId,
         formId: id,
         formTitle: formConfig?.title || 'Unknown Form',
         payload: submissionPayload,
@@ -721,25 +784,30 @@ function FormRenderer() {
       };
 
       if (!navigator.onLine) {
-        // Offline Queuing
+        // Offline Queuing with unique idempotency ID
         await addSubmissionToQueue(finalPayload);
         if (activeDraftId) await deleteDraft(activeDraftId);
         alert("⚠️ Offline Mode: Form completed successfully! Your answers are saved locally and will automatically sync when you reconnect.");
         navigate('/history');
       } else {
-        // Online Submission
+        // Online Submission with Idempotency Key header
         const res = await fetch(submitUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: submissionPayload })
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': clientSubmissionId
+          },
+          body: JSON.stringify({
+            data: submissionPayload,
+            client_submission_id: clientSubmissionId
+          })
         });
         if (res.ok) {
           if (activeDraftId) await deleteDraft(activeDraftId);
           alert("Form submitted successfully!");
           navigate('/history');
         } else {
-          // If the server is unreachable (5xx/4xx), maybe we should also queue it?
-          // For now, let's queue it as a fallback.
+          // If the server is unreachable (5xx/4xx), queue locally with the SAME idempotency ID
           await addSubmissionToQueue(finalPayload);
           if (activeDraftId) await deleteDraft(activeDraftId);
           alert("Server issue detected. Saved locally to sync later.");
@@ -748,11 +816,14 @@ function FormRenderer() {
       }
     } catch (e) {
       console.error(e);
-      // Fallback queuing if network error during fetch
+      // Fallback queuing if network error occurs mid-request
+      const fallbackId = crypto.randomUUID();
       await addSubmissionToQueue({
+        id: fallbackId,
         formId: id,
         formTitle: formConfig?.title || 'Unknown Form',
         payload: submissionPayload,
+        targetUrl: submitUrl
       });
       if (activeDraftId) await deleteDraft(activeDraftId);
       alert("Network error. Saved locally to sync later.");
@@ -770,39 +841,80 @@ function FormRenderer() {
     window.scrollTo(0, 0);
   };
 
-  if (loading) return <div className="p-8 flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-slate-50/60 font-sans flex flex-col items-center justify-center gap-3">
+      <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-teal-600 animate-spin" />
+      <span className="font-mono text-xs text-slate-500">Loading clinical protocol instrument...</span>
+    </div>
+  );
 
   const currentFields = pages[currentPageIndex]?.fields || [];
   const totalPages = pages.length;
 
   return (
-    <div className="p-8 max-w-6xl mx-auto font-sans">
-      <Link to="/" className="text-gray-500 hover:text-gray-800 mb-6 inline-block">← Back to Forms</Link>
+    <div className="min-h-screen radiant-canvas font-sans text-slate-900 antialiased selection:bg-blue-100 selection:text-blue-900">
+      <NavBar />
 
-      <div className="bg-white shadow-lg rounded-2xl overflow-hidden border border-gray-100">
-        <div className="bg-green-600 p-6 text-white">
-          <h1 className="text-2xl font-bold">{pages[currentPageIndex]?.title || formConfig.title}</h1>
-          {(pages[currentPageIndex]?.description || (currentPageIndex === 0 && formConfig.description)) && <p className="mt-2 opacity-90">{pages[currentPageIndex]?.description || formConfig.description}</p>}
-
-          {totalPages > 1 && (
-            <div className="mt-6 flex flex-col gap-2">
-              <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-green-100">
-                <span>Step {currentPageIndex + 1} of {totalPages}</span>
-              </div>
-              <div className="flex gap-2">
-                {pages.map((_, i) => (
-                  <div key={i} className={`h-2 flex-1 rounded-full ${i <= currentPageIndex ? 'bg-white' : 'bg-green-800 bg-opacity-40'}`}></div>
-                ))}
-              </div>
-            </div>
-          )}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        <div className="mb-6 flex items-center justify-between">
+          <Link
+            to="/forms"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Return to Protocols</span>
+          </Link>
+          <div className="flex items-center gap-2 font-mono text-xs text-slate-400">
+            <span>PROTOCOL #{id}</span>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-8 flex flex-wrap -mx-3">
+        <div className="radiant-card rounded-2xl overflow-hidden mb-8">
+          {/* Header */}
+          <div className="p-6 sm:p-7 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <span className="font-mono text-[11px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200/60 uppercase">
+                {formConfig.title}
+              </span>
+              {totalPages > 1 && (
+                <span className="font-mono text-xs text-slate-500 font-semibold">
+                  Step {currentPageIndex + 1} of {totalPages}
+                </span>
+              )}
+            </div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-950 tracking-tight">
+              {pages[currentPageIndex]?.title || formConfig.title}
+            </h1>
+            {(pages[currentPageIndex]?.description || (currentPageIndex === 0 && formConfig.description)) && (
+              <p className="mt-1.5 text-xs sm:text-sm text-slate-600 leading-relaxed">
+                {pages[currentPageIndex]?.description || formConfig.description}
+              </p>
+            )}
+
+            {totalPages > 1 && (
+              <div className="mt-4 flex gap-1.5">
+                {pages.map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1.5 flex-1 rounded-full transition-all ${
+                      i <= currentPageIndex ? 'bg-teal-600' : 'bg-slate-100'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="p-6 sm:p-8 flex flex-wrap -mx-3">
           {isReviewMode ? (
             <div className="w-full px-3 mb-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-2">Review Your Answers</h2>
-              <div className="space-y-6">
+              <div className="flex items-center justify-between pb-3 mb-6 border-b border-slate-200">
+                <h2 className="text-base font-bold text-slate-950">Verification &amp; Review</h2>
+                <span className="font-mono text-xs text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded font-semibold border border-teal-200/60">
+                  Pre-Submission Audit
+                </span>
+              </div>
+              <div className="space-y-4">
                 {pages.map((page, pIdx) => {
                   const visibleFields = page.fields.filter(f => {
                     const logicRes = evaluateLogic(f.logic, formValues);
@@ -811,9 +923,11 @@ function FormRenderer() {
                   if (visibleFields.length === 0) return null;
                   
                   return (
-                    <div key={pIdx} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                      <h3 className="text-lg font-semibold text-green-700 mb-4">{page.title || `Section ${pIdx + 1}`}</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6">
+                    <div key={pIdx} className="bg-slate-50/60 rounded-xl p-5 border border-slate-200/80">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-teal-800 font-mono mb-3">
+                        {page.title || `Section ${pIdx + 1}`}
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3.5 gap-x-6">
                         {visibleFields.map(field => {
                           if (['page_break', 'section_header', 'instruction', 'divider'].includes(field.type)) return null;
                           let val = getValues(field.id);
@@ -821,31 +935,31 @@ function FormRenderer() {
                           // Format value for display
                           let displayVal = val;
                           if (val === undefined || val === null || val === '') {
-                             displayVal = <span className="text-gray-400 italic">Not provided</span>;
+                             displayVal = <span className="text-slate-400 italic font-mono text-xs">Not recorded</span>;
                           } else if (typeof val === 'boolean') {
-                             displayVal = val ? 'Yes' : 'No';
+                             displayVal = <span className="font-mono font-bold text-xs">{val ? 'Yes' : 'No'}</span>;
                           } else if (Array.isArray(val)) {
-                             displayVal = val.length > 0 ? val.join(', ') : <span className="text-gray-400 italic">None selected</span>;
+                             displayVal = val.length > 0 ? val.join(', ') : <span className="text-slate-400 italic font-mono text-xs">None</span>;
                           } else if (field.type === 'signature') {
-                             displayVal = val ? <img src={val} alt="Signature" className="h-16 border rounded bg-white" /> : <span className="text-gray-400 italic">Not signed</span>;
+                             displayVal = val ? <img src={val} alt="Signature" className="h-14 border border-slate-200 rounded-lg bg-white p-1" /> : <span className="text-slate-400 italic font-mono text-xs">Not signed</span>;
                           } else if (field.type === 'image') {
-                             displayVal = val ? <img src={val} alt="Uploaded" className="h-20 rounded" /> : <span className="text-gray-400 italic">No image</span>;
+                             displayVal = val ? <img src={val} alt="Uploaded" className="h-16 rounded-lg border border-slate-200" /> : <span className="text-slate-400 italic font-mono text-xs">No image</span>;
                           } else if (field.type === 'dietary_recall_24h' && typeof val === 'object') {
                              displayVal = Object.entries(val).filter(([_, items]) => items && items.length > 0).map(([meal, items]) => (
-                               <div key={meal} className="mb-2">
-                                 <strong className="text-sm">{meal}:</strong>
-                                 <ul className="list-disc list-inside text-sm pl-2">
+                               <div key={meal} className="mb-1 text-xs">
+                                 <strong className="font-semibold text-slate-800">{meal}:</strong>
+                                 <ul className="list-disc list-inside pl-2 text-slate-600">
                                    {items.map((item, i) => <li key={i}>{typeof item === 'string' ? item : item.name}</li>)}
                                  </ul>
                                </div>
                              ));
-                             if (!displayVal.length) displayVal = <span className="text-gray-400 italic">No items recorded</span>;
+                             if (!displayVal.length) displayVal = <span className="text-slate-400 italic font-mono text-xs">No entries</span>;
                           }
                           
                           return (
                             <div key={field.id} className="flex flex-col">
-                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{field.label}</span>
-                              <div className="text-gray-800 font-medium mt-1">{displayVal}</div>
+                              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{field.label}</span>
+                              <div className="text-slate-900 font-medium mt-0.5 text-sm">{displayVal}</div>
                             </div>
                           );
                         })}
@@ -932,23 +1046,23 @@ function FormRenderer() {
             }
 
             return (
-              <div key={field.id} className={`px-3 mb-6 ${widthClass}`}>
-                <div className={`flex flex-col h-full ${isLayout ? '' : 'bg-gray-50 p-5 rounded-xl border border-gray-100'}`}>
+              <div key={field.id} className={`px-3 mb-5 ${widthClass}`}>
+                <div className={`flex flex-col h-full ${isLayout ? '' : 'bg-slate-50/50 p-4 sm:p-5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors'}`}>
                 {!isLayout && (
                   <>
-                    <label className="font-semibold text-gray-800 mb-1 flex items-center text-lg">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-800 mb-1.5 flex items-center">
                       {field.label}
-                      {isRequired && <span className="text-red-500 ml-1" title="Required">*</span>}
+                      {isRequired && <span className="text-rose-500 ml-1 font-bold" title="Required">*</span>}
                     </label>
-                    {field.helpText && <p className="text-sm text-gray-500 mb-3">{field.helpText}</p>}
-                    {!field.helpText && <div className="mb-2"></div>}
+                    {field.helpText && <p className="text-xs text-slate-500 mb-2 leading-relaxed">{field.helpText}</p>}
+                    {!field.helpText && <div className="mb-1"></div>}
                   </>
                 )}
 
                 {field.type === 'text' && (
                   <input
                     type="text"
-                    className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                    className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400"
                     placeholder={field.placeholder || "Text input"}
                     {...register(field.id, validationRules)}
                   />
@@ -957,7 +1071,7 @@ function FormRenderer() {
                 {field.type === 'textarea' && (
                   <textarea
                     rows="4"
-                    className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                    className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400"
                     placeholder={field.placeholder || "Long text"}
                     {...register(field.id, validationRules)}
                   />
@@ -966,7 +1080,7 @@ function FormRenderer() {
                 {field.type === 'number' && (
                   <input
                     type="number"
-                    className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                    className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400"
                     placeholder={field.placeholder || "0"}
                     onWheel={(e) => e.target.blur()}
                     {...register(field.id, validationRules)}
@@ -976,7 +1090,7 @@ function FormRenderer() {
                 {field.type === 'email' && (
                   <input
                     type="email"
-                    className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                    className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400"
                     placeholder={field.placeholder || "email@example.com"}
                     {...register(field.id, validationRules)}
                   />
@@ -985,7 +1099,7 @@ function FormRenderer() {
                 {field.type === 'phone' && (
                   <input
                     type="tel"
-                    className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                    className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400"
                     placeholder={field.placeholder || "+1 234 567 8900"}
                     {...register(field.id, validationRules)}
                   />
@@ -998,7 +1112,7 @@ function FormRenderer() {
                   return (
                     <input
                       type="date"
-                      className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                      className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900"
                       min={minAttr}
                       max={maxAttr}
                       {...register(field.id, {
@@ -1013,7 +1127,7 @@ function FormRenderer() {
                 {field.type === 'time' && (
                   <input
                     type="time"
-                    className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                    className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900"
                     {...register(field.id, validationRules)}
                   />
                 )}
@@ -1023,7 +1137,7 @@ function FormRenderer() {
                   const years = Array.from({ length: 120 }, (_, i) => currentYear - i);
                   return (
                     <select
-                      className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                      className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900"
                       {...register(field.id, validationRules)}
                     >
                       <option value="">{field.placeholder || "Select Year..."}</option>
@@ -1033,20 +1147,20 @@ function FormRenderer() {
                 })()}
 
                 {field.type === 'checkbox' && (
-                  <div className="flex items-center mt-1 bg-white p-3 border border-gray-200 rounded-lg">
+                  <div className="flex items-center mt-1 bg-white p-3 border border-slate-200 rounded-lg hover:border-slate-300 transition">
                     <input
                       type="checkbox"
-                      className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 transition"
+                      className="w-4 h-4 text-teal-700 border-slate-300 rounded focus:ring-teal-600 transition"
                       {...register(field.id, validationRules)}
                     />
-                    <span className="ml-3 text-gray-700">Check to confirm</span>
+                    <span className="ml-3 text-slate-800 text-sm font-medium">Check to confirm</span>
                   </div>
                 )}
 
                 {field.type === 'dropdown' && (
                   <div className="space-y-2">
                     <select
-                      className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+                      className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900"
                       {...register(field.id, validationRules)}
                     >
                       <option value="">{field.placeholder || "Select..."}</option>
@@ -1058,7 +1172,7 @@ function FormRenderer() {
                       <input
                         type="text"
                         placeholder="Please specify..."
-                        className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                        className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-slate-50 mt-2 text-slate-900"
                         {...register(`${field.id}_otherText`, { required: "Please specify" })}
                       />
                     )}
@@ -1086,7 +1200,7 @@ function FormRenderer() {
                       <input
                         type="text"
                         placeholder="Please specify..."
-                        className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                        className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-slate-50 mt-2 text-slate-900"
                         {...register(`${field.id}_otherText`, { required: "Please specify" })}
                       />
                     )}
@@ -1094,23 +1208,23 @@ function FormRenderer() {
                 )}
 
                 {field.type === 'radio' && (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {getVisibleOptions(field).map((opt, i) => (
-                      <label key={i} className="flex items-center bg-white p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-300 transition">
+                      <label key={i} className="flex items-center bg-white p-3 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-500/60 transition text-sm">
                         <input
                           type="radio"
                           value={opt}
-                          className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 transition"
+                          className="w-4 h-4 text-teal-700 border-slate-300 focus:ring-teal-600 transition"
                           {...register(field.id, validationRules)}
                         />
-                        <span className="ml-3 text-gray-700">{opt}</span>
+                        <span className="ml-3 text-slate-800 font-medium">{opt}</span>
                       </label>
                     ))}
                     {String(formValues?.[field.id] || '').toLowerCase() === 'other' && (
                       <input
                         type="text"
                         placeholder="Please specify..."
-                        className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                        className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-slate-50 mt-2 text-slate-900"
                         {...register(`${field.id}_otherText`, { required: "Please specify" })}
                       />
                     )}
@@ -1118,23 +1232,23 @@ function FormRenderer() {
                 )}
 
                 {field.type === 'gender' && (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {(field.options || ['Male', 'Female', 'Other', 'Prefer not to say']).map((opt, i) => (
-                      <label key={i} className="flex items-center bg-white p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-300 transition">
+                      <label key={i} className="flex items-center bg-white p-3 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-500/60 transition text-sm">
                         <input
                           type="radio"
                           value={opt}
-                          className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 transition"
+                          className="w-4 h-4 text-teal-700 border-slate-300 focus:ring-teal-600 transition"
                           {...register(field.id, validationRules)}
                         />
-                        <span className="ml-3 text-gray-700">{opt}</span>
+                        <span className="ml-3 text-slate-800 font-medium">{opt}</span>
                       </label>
                     ))}
                     {String(formValues?.[field.id] || '').toLowerCase() === 'other' && (
                       <input
                         type="text"
                         placeholder="Please specify..."
-                        className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                        className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-slate-50 mt-2 text-slate-900"
                         {...register(`${field.id}_otherText`, { required: "Please specify" })}
                       />
                     )}
@@ -1149,11 +1263,11 @@ function FormRenderer() {
                     render={({ field: { onChange, value } }) => {
                       const currentValues = Array.isArray(value) ? value : [];
                       return (
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           {getVisibleOptions(field).map((opt, i) => {
                             const isNone = opt.toLowerCase() === 'none' || opt.toLowerCase() === 'none of the above' || opt.toLowerCase() === 'none of these';
                             return (
-                              <label key={i} className="flex items-center bg-white p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-300 transition">
+                              <label key={i} className="flex items-center bg-white p-3 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-500/60 transition text-sm">
                                 <input
                                   type="checkbox"
                                   value={opt}
@@ -1173,9 +1287,9 @@ function FormRenderer() {
                                       onChange(currentValues.filter(v => v !== opt));
                                     }
                                   }}
-                                  className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 transition"
+                                  className="w-4 h-4 text-teal-700 border-slate-300 focus:ring-teal-600 transition"
                                 />
-                                <span className="ml-3 text-gray-700">{opt}</span>
+                                <span className="ml-3 text-slate-800 font-medium">{opt}</span>
                               </label>
                             );
                           })}
@@ -1183,7 +1297,7 @@ function FormRenderer() {
                             <input
                               type="text"
                               placeholder="Please specify..."
-                              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                              className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-slate-50 mt-2 text-slate-900"
                               {...register(`${field.id}_otherText`, { required: "Please specify" })}
                             />
                           )}
@@ -1192,6 +1306,7 @@ function FormRenderer() {
                     }}
                   />
                 )}
+
                 {field.type === 'searchable_multi_select' && (
                   <Controller
                     name={field.id}
@@ -1236,7 +1351,7 @@ function FormRenderer() {
                           <input
                             type="text"
                             placeholder="Please specify..."
-                            className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-gray-50 mt-2"
+                            className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-slate-50 mt-2 text-slate-900"
                             {...register(`${field.id}_otherText`, { required: "Please specify" })}
                           />
                         )}
@@ -1248,7 +1363,7 @@ function FormRenderer() {
                 {field.type === 'file' && (
                   <input
                     type="file"
-                    className="border border-gray-300 p-2.5 rounded-lg bg-white w-full text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition"
+                    className="border border-slate-300 p-2 rounded-lg bg-white w-full text-xs text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-800 hover:file:bg-teal-100 transition"
                     {...register(field.id, validationRules)}
                   />
                 )}
@@ -1257,7 +1372,7 @@ function FormRenderer() {
                   <input
                     type="file"
                     accept="image/*"
-                    className="border border-gray-300 p-2.5 rounded-lg bg-white w-full text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition"
+                    className="border border-slate-300 p-2 rounded-lg bg-white w-full text-xs text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-800 hover:file:bg-teal-100 transition"
                     {...register(field.id, validationRules)}
                   />
                 )}
@@ -1274,7 +1389,7 @@ function FormRenderer() {
                             key={i}
                             type="button"
                             onClick={() => onChange(i + 1)}
-                            className={`text-4xl focus:outline-none transition ${value > i ? 'text-yellow-400' : 'text-gray-200 hover:text-yellow-200'}`}
+                            className={`text-3xl focus:outline-none transition ${value > i ? 'text-amber-400' : 'text-slate-200 hover:text-amber-200'}`}
                           >
                             ★
                           </button>
@@ -1295,15 +1410,15 @@ function FormRenderer() {
                       const options = Array.from({ length: max - min + 1 }, (_, i) => min + i);
                       return (
                         <div>
-                          <div className="flex justify-between text-xs text-gray-500 mb-3 font-bold uppercase tracking-wider">
+                          <div className="flex justify-between text-[11px] text-slate-500 mb-2 font-mono font-bold uppercase tracking-wider">
                             <span>{field.scale?.minLabel || 'Poor'}</span>
-                            <span>{field.scale?.maxLabel || 'Excellent'}</span>
+                            <span>{field.scale?.maxLabel || 'Optimal'}</span>
                           </div>
-                          <div className="flex justify-between items-center gap-1 bg-white p-3 border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
+                          <div className="flex justify-between items-center gap-1 bg-white p-2.5 border border-slate-200 rounded-lg shadow-2xs overflow-x-auto">
                             {options.map(opt => (
-                              <label key={opt} className="flex flex-col items-center gap-2 cursor-pointer flex-1 group min-w-[30px]">
-                                <input type="radio" name={field.id} value={opt} onChange={() => onChange(opt)} checked={value === opt} className="w-5 h-5 text-green-600 focus:ring-green-500" />
-                                <span className={`text-sm font-semibold transition ${value === opt ? 'text-green-600' : 'text-gray-500 group-hover:text-green-500'}`}>{opt}</span>
+                              <label key={opt} className="flex flex-col items-center gap-1.5 cursor-pointer flex-1 group min-w-[28px]">
+                                <input type="radio" name={field.id} value={opt} onChange={() => onChange(opt)} checked={value === opt} className="w-4 h-4 text-teal-700 focus:ring-teal-600" />
+                                <span className={`text-xs font-mono font-bold transition ${value === opt ? 'text-teal-700' : 'text-slate-500 group-hover:text-slate-800'}`}>{opt}</span>
                               </label>
                             ))}
                           </div>
@@ -1319,13 +1434,15 @@ function FormRenderer() {
                     control={control}
                     rules={validationRules}
                     render={({ field: { onChange } }) => (
-                      <div className="border border-gray-300 rounded-lg bg-white overflow-hidden shadow-inner">
+                      <div className="border border-slate-300 rounded-lg bg-white overflow-hidden shadow-2xs">
                         <SignatureCanvas
-                          penColor="black"
-                          canvasProps={{ className: 'w-full h-40 bg-gray-50 cursor-crosshair' }}
+                          penColor="#090D16"
+                          canvasProps={{ className: 'w-full h-36 bg-slate-50/50 cursor-crosshair' }}
                           onEnd={function () { onChange(this.toDataURL()); }}
                         />
-                        <div className="bg-gray-100 px-4 py-2.5 text-xs text-gray-500 border-t border-gray-200 font-medium uppercase tracking-wider text-right">Sign inside the box</div>
+                        <div className="bg-slate-100/70 px-3 py-1.5 text-[10px] text-slate-500 border-t border-slate-200 font-mono font-semibold uppercase tracking-wider text-right">
+                          Record participant verification signature above
+                        </div>
                       </div>
                     )}
                   />
@@ -1397,9 +1514,9 @@ function FormRenderer() {
                   />
                 )}
 
-                {field.type === 'section_header' && <h2 className="text-2xl font-bold text-gray-800 border-b border-gray-200 pb-2">{field.label}</h2>}
-                {field.type === 'instruction' && <p className="text-gray-700 bg-blue-50 p-5 rounded-xl border border-blue-100 text-[15px] leading-relaxed">{field.description}</p>}
-                {field.type === 'divider' && <hr className="border-gray-200 my-6 border-t-2" />}
+                {field.type === 'section_header' && <h2 className="text-base font-extrabold text-slate-950 border-b border-slate-200 pb-2">{field.label}</h2>}
+                {field.type === 'instruction' && <p className="text-slate-700 bg-teal-50/60 p-4 rounded-xl border border-teal-200/70 text-xs sm:text-sm leading-relaxed">{field.description}</p>}
+                {field.type === 'divider' && <hr className="border-slate-200 my-4" />}
 
                 {field.type === 'dietary_recall_24h' && (
                   <DietaryRecallField
@@ -1409,7 +1526,7 @@ function FormRenderer() {
                   />
                 )}
 
-                {errors[field.id] && <span className="text-red-500 text-sm mt-2 flex items-center gap-1 font-medium"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> {errors[field.id].message}</span>}
+                {errors[field.id] && <span className="text-rose-600 text-xs mt-1.5 flex items-center gap-1 font-semibold"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> {errors[field.id].message}</span>}
                 </div>
               </div>
             );
@@ -1417,52 +1534,80 @@ function FormRenderer() {
           )}
 
           {isTerminated && (
-            <div className="w-full px-3 mt-8 bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl flex items-center justify-center gap-3">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-              <span className="font-semibold text-[15px]">Form completed based on responses.</span>
+            <div className="w-full px-3 mt-4 bg-rose-50 border border-rose-200 text-rose-900 p-3 rounded-lg flex items-center justify-center gap-2 text-xs font-semibold">
+              <svg className="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              <span>Questionnaire terminated according to protocol stop criteria.</span>
             </div>
           )}
 
           {/* Auto-save status indicator */}
           {autoSaveStatus && (
-            <div className={`w-full px-3 flex items-center gap-2 text-xs font-semibold transition-all duration-500 ${autoSaveStatus === 'saved' ? 'text-emerald-600' : 'text-amber-500'}`}>
+            <div className={`w-full px-3 mt-3 flex items-center gap-2 text-xs font-mono font-semibold transition-all duration-500 ${autoSaveStatus === 'saved' ? 'text-teal-700' : 'text-amber-600'}`}>
               {autoSaveStatus === 'saving' ? (
                 <>
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
-                  Auto-saving draft…
+                  <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  Auto-saving session cache…
                 </>
               ) : (
                 <>
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  Draft auto-saved ✓
+                  <span className="inline-block w-2 h-2 rounded-full bg-teal-500" />
+                  Encrypted draft cached locally ✓
                 </>
               )}
             </div>
           )}
 
-          <div className="w-full px-3 pt-6 border-t border-gray-100 mt-8 flex flex-col sm:flex-row justify-between gap-4">
+          <div className="w-full px-3 pt-6 border-t border-slate-100 mt-6 flex flex-col sm:flex-row justify-between gap-3">
             <div className="flex gap-2 flex-1">
               {currentPageIndex > 0 ? (
-                <button type="button" onClick={handlePrevPage} className="flex-1 bg-slate-100 text-slate-700 px-4 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
-                  <ChevronLeft className="w-4 h-4" /> Previous
+                <button
+                  type="button"
+                  onClick={handlePrevPage}
+                  className="flex-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-4 py-2.5 rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer active:translate-y-[1px]"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Previous
                 </button>
               ) : (
-                <button type="button" onClick={() => navigate('/forms')} className="flex-1 bg-slate-100 text-slate-700 px-4 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
-                  <ArrowLeft className="w-4 h-4" /> Exit
+                <button
+                  type="button"
+                  onClick={() => navigate('/forms')}
+                  className="flex-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-4 py-2.5 rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer active:translate-y-[1px]"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Exit
                 </button>
               )}
 
-              <button type="button" onClick={handleSaveDraft} className="flex-1 bg-amber-50 text-amber-700 border border-amber-200 px-4 py-3 rounded-xl font-bold text-sm hover:bg-amber-100/80 transition flex items-center justify-center gap-1.5 cursor-pointer">
-                <FolderHeart className="w-4 h-4" /> Save Draft
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                className="flex-1 bg-amber-50 text-amber-800 border border-amber-300/80 px-4 py-2.5 rounded-lg font-bold text-xs hover:bg-amber-100 transition flex items-center justify-center gap-1.5 cursor-pointer active:translate-y-[1px]"
+              >
+                <FolderHeart className="w-3.5 h-3.5 text-amber-700" /> Save Draft
               </button>
             </div>
 
-            <button type="submit" className={`flex-1 text-white px-6 py-3 rounded-xl font-bold text-md transition shadow-md hover:shadow-lg cursor-pointer ${isReviewMode ? 'bg-emerald-600 hover:bg-emerald-700' : (isTerminated ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700')}`}>
-              {isReviewMode ? 'Submit Form' : (isTerminated ? 'Review Form (Terminated)' : (currentPageIndex < totalPages - 1 ? 'Next' : 'Review Form'))}
+            <button
+              type="submit"
+              className={`flex-1 text-white px-5 py-2.5 rounded-lg font-bold text-xs transition shadow-xs cursor-pointer active:translate-y-[1px] ${
+                isReviewMode
+                  ? 'bg-emerald-700 hover:bg-emerald-800'
+                  : isTerminated
+                  ? 'bg-rose-700 hover:bg-rose-800'
+                  : 'bg-teal-700 hover:bg-teal-800'
+              }`}
+            >
+              {isReviewMode
+                ? 'Confirm & Transmit Submission'
+                : isTerminated
+                ? 'Review Form (Terminated)'
+                : currentPageIndex < totalPages - 1
+                ? 'Save & Continue'
+                : 'Review Answers'}
             </button>
           </div>
         </form>
       </div>
+      </main>
     </div>
   );
 }

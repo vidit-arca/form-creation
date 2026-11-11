@@ -1,5 +1,5 @@
-import React, { useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useRef, useEffect } from 'react';
+import { Search, Plus } from 'lucide-react';
 import { TOOLBOX_ITEMS } from '../../constants/toolboxItems';
 
 export function Toolbox({ addField, searchQuery, setSearchQuery }) {
@@ -8,7 +8,10 @@ export function Toolbox({ addField, searchQuery, setSearchQuery }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       const activeTag = document.activeElement?.tagName;
-      const isInputFocused = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || document.activeElement?.isContentEditable;
+      const isInputFocused =
+        activeTag === 'INPUT' ||
+        activeTag === 'TEXTAREA' ||
+        document.activeElement?.isContentEditable;
       if (e.key === '/' && !isInputFocused) {
         e.preventDefault();
         searchInputRef.current?.focus();
@@ -19,43 +22,72 @@ export function Toolbox({ addField, searchQuery, setSearchQuery }) {
   }, []);
 
   return (
-    <div className="w-64 bg-white shadow-md border-r border-gray-200 flex flex-col z-10">
-      <div className="p-4 border-b border-gray-100 flex items-center gap-2">
-        <Link to="/" className="text-gray-500 hover:text-gray-800">← Back</Link>
-        <h2 className="font-bold text-lg text-gray-800">Toolbox</h2>
-      </div>
-      <div className="p-4 flex-1 overflow-y-auto space-y-2">
-        <div className="mb-4 relative">
-          <input 
-            ref={searchInputRef}
-            type="text" 
-            placeholder="Search fields (press '/')" 
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-          <svg className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+    <aside className="w-68 bg-white border-r border-slate-200 flex flex-col z-10 select-none">
+      {/* Toolbox Header */}
+      <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center font-bold text-xs">
+            +
+          </div>
+          <h2 className="font-bold text-xs uppercase tracking-wider text-slate-900 font-mono">
+            Field Palette
+          </h2>
         </div>
+        <span className="text-[10px] font-mono text-slate-400">32 TOOLS</span>
+      </div>
 
-        {[...new Set(TOOLBOX_ITEMS.map(item => item.category))].map(category => {
-          const items = TOOLBOX_ITEMS.filter(item => item.category === category && item.label.toLowerCase().includes(searchQuery.toLowerCase()));
+      {/* Search Input Bar */}
+      <div className="p-3 border-b border-slate-100">
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search fields (press '/')..."
+            aria-label="Search form fields palette"
+            className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <kbd className="absolute right-2 top-2 font-mono text-[10px] text-slate-400 bg-white px-1 rounded border border-slate-200">
+            /
+          </kbd>
+        </div>
+      </div>
+
+      {/* Field Item Categories */}
+      <div className="p-3 flex-1 overflow-y-auto space-y-4 text-xs">
+        {[...new Set(TOOLBOX_ITEMS.map((item) => item.category))].map((category) => {
+          const items = TOOLBOX_ITEMS.filter(
+            (item) =>
+              item.category === category &&
+              item.label.toLowerCase().includes(searchQuery.toLowerCase())
+          );
           if (items.length === 0) return null;
           return (
-            <React.Fragment key={category}>
-              <p className={`text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ${category !== TOOLBOX_ITEMS[0].category ? 'mt-6' : ''}`}>{category}</p>
-              {items.map(item => (
-                <button 
-                  key={item.type}
-                  onClick={() => addField(item.type)} 
-                  className={`w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition shadow-sm text-sm font-medium ${item.type === 'page_break' ? 'border-dashed bg-gray-50' : ''}`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </React.Fragment>
+            <div key={category} className="space-y-1.5">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 font-mono">
+                {category}
+              </p>
+              <div className="space-y-1">
+                {items.map((item) => (
+                  <button
+                    key={item.type}
+                    type="button"
+                    onClick={() => addField(item.type)}
+                    className={`w-full text-left px-3 py-2 rounded-md border border-slate-200/80 bg-white hover:border-blue-400 hover:bg-blue-50/40 text-slate-800 transition shadow-2xs text-xs font-medium flex items-center justify-between group active:translate-y-[1px] ${
+                      item.type === 'page_break' ? 'border-dashed bg-slate-50/60' : ''
+                    }`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                    <Plus className="w-3 h-3 text-slate-400 group-hover:text-blue-700 transition shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
           );
         })}
       </div>
-    </div>
+    </aside>
   );
 }

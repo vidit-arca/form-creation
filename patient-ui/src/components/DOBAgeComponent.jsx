@@ -38,18 +38,22 @@ export function DOBAgeComponent({ field, value, onChange }) {
   return (
     <div className="flex flex-col sm:flex-row gap-4">
       <div className="flex-1">
-        <label className="text-sm font-bold text-gray-700 block mb-2">Date of Birth {field.required && <span className="text-red-500">*</span>}</label>
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block mb-1">
+          Date of Birth {field.required && <span className="text-rose-500">*</span>}
+        </label>
         <input 
           type="date" 
-          className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+          className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900"
           value={dob}
           onChange={handleDobChange}
         />
       </div>
       <div className="sm:w-1/3">
-        <label className="text-sm font-bold text-gray-700 block mb-2">Age</label>
-        <div className="w-full border border-gray-200 p-3 rounded-lg bg-gray-50 text-gray-600 font-medium h-[50px] flex items-center">
-          {age !== '' ? `${age} years` : '--'}
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block mb-1">
+          Chronological Age
+        </label>
+        <div className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 text-slate-800 font-mono font-bold flex items-center">
+          {age !== '' ? `${age} yrs` : '—'}
         </div>
       </div>
     </div>

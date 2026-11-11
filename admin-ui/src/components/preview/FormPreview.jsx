@@ -198,7 +198,7 @@ export function FormPreview({ schemaData, title }) {
   };
 
   return (
-     <div className="bg-white p-8 shadow-sm border border-gray-200 rounded-xl min-h-[600px] max-w-3xl mx-auto mt-6">
+     <div className="bg-white p-8 shadow-sm border border-gray-200 rounded-xl min-h-[600px] max-w-6xl mx-auto mt-6">
        <div className="bg-yellow-500 text-yellow-900 px-6 py-2.5 text-center text-sm font-bold uppercase tracking-widest shadow-inner mb-0 -mx-8 -mt-8 rounded-t-xl flex justify-center items-center gap-2">
          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
          Preview Mode - Data will not be saved
@@ -219,7 +219,7 @@ export function FormPreview({ schemaData, title }) {
            </div>
          )}
        </div>
-       <form className="space-y-6">
+       <form className="flex flex-wrap -mx-3">
           {currentFields.map(field => {
              let isRequired = field.required;
 
@@ -263,9 +263,20 @@ export function FormPreview({ schemaData, title }) {
              }
 
              const isLayout = ['section_header', 'instruction', 'divider'].includes(field.type);
+             const isDefaultFullWidth = ['section_header', 'instruction', 'divider', 'textarea', 'file', 'image', 'signature', 'cohort_input', 'dietary_recall_24h'].includes(field.type);
+
+             let widthClass = 'w-full md:w-1/2';
+             if (field.width === 'full' || (!field.width && isDefaultFullWidth)) {
+               widthClass = 'w-full';
+             } else if (field.width === 'half') {
+               widthClass = 'w-full md:w-1/2';
+             } else if (field.width === 'third') {
+               widthClass = 'w-full md:w-1/3';
+             }
 
              return (
-               <div key={field.id} className={`flex flex-col ${isLayout ? '' : 'bg-gray-50 p-4 rounded-lg border border-gray-100'}`}>
+               <div key={field.id} className={`px-3 mb-6 ${widthClass}`}>
+                 <div className={`flex flex-col h-full ${isLayout ? '' : 'bg-gray-50 p-4 rounded-lg border border-gray-100'}`}>
                  {!isLayout && (
                    <>
                      <label className="font-semibold text-gray-700 mb-1 flex items-center">
@@ -533,12 +544,52 @@ export function FormPreview({ schemaData, title }) {
                  {field.type === 'section_header' && <h2 className="text-2xl font-bold text-gray-800 border-b border-gray-200 pb-2">{field.label}</h2>}
                  {field.type === 'instruction' && <p className="text-gray-700 bg-blue-50 p-5 rounded-xl border border-blue-100 text-[15px] leading-relaxed">{field.description}</p>}
                  {field.type === 'divider' && <hr className="border-gray-200 my-6 border-t-2" />}
+
+                 {field.type === 'dietary_recall_24h' && (
+                   <div className="space-y-2">
+                     {(field.config?.mealSlots || ['Early Morning', 'Breakfast', 'Mid-Morning', 'Lunch', 'Evening Snack', 'Dinner', 'Bedtime']).map((slot) => (
+                       <div key={slot} className="border border-emerald-200 rounded-xl overflow-hidden">
+                         <div className="flex items-center justify-between px-4 py-3 bg-emerald-50">
+                           <span className="text-sm font-semibold text-emerald-800">{slot}</span>
+                           <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                           </svg>
+                         </div>
+                         <div className="px-4 py-3 bg-white">
+                           <div className="flex gap-2">
+                             <textarea
+                               rows={2}
+                               placeholder={`e.g. "2 rotis with 1 bowl of dal and a cup of curd"`}
+                               className="flex-1 border border-gray-200 rounded-lg p-2 text-sm text-gray-500 resize-none bg-gray-50"
+                               disabled
+                             />
+                             <div className="flex-shrink-0 bg-emerald-600 text-white text-xs font-semibold px-3 rounded-lg flex items-center gap-1 opacity-70">
+                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                               </svg>
+                               Match Items
+                             </div>
+                           </div>
+                           {field.config?.allowCustomItems !== false && (
+                             <p className="text-xs text-emerald-500 mt-2 flex items-center gap-1">
+                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                               </svg>
+                               Add custom food item
+                             </p>
+                           )}
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 )}
                  
                  {errors[field.id] && <span className="text-red-500 text-sm mt-2 font-medium flex items-center gap-1"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> {errors[field.id].message}</span>}
+                 </div>
                </div>
              );
           })}
-           <div className="pt-6 border-t border-gray-100 mt-8 flex justify-between gap-4">
+           <div className="w-full px-3 pt-6 border-t border-gray-100 mt-8 flex justify-between gap-4">
              {currentPageIndex > 0 ? (
                <button onClick={handlePrev} className="flex-1 bg-gray-100 text-gray-700 px-6 py-3.5 rounded-xl font-bold text-lg hover:bg-gray-200 transition">Previous</button>
              ) : <div className="flex-1"></div>}

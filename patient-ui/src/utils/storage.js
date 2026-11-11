@@ -25,13 +25,15 @@ export const sessionStore = localforage.createInstance({
  * @param {Object} submissionData
  */
 export const addSubmissionToQueue = async (submissionData) => {
-  const id = crypto.randomUUID();
+  const id = submissionData.id || crypto.randomUUID();
   const submission = {
     ...submissionData,
     id,
-    timestamp: new Date().toISOString(),
+    timestamp: submissionData.timestamp || new Date().toISOString(),
     syncStatus: 'PENDING',
     retryCount: 0,
+    nextRetryAt: 0,
+    lastAttemptAt: null,
     errorMessage: null
   };
   await submissionQueueStore.setItem(id, submission);
@@ -136,5 +138,61 @@ export const getAllDrafts = async () => {
  */
 export const deleteDraft = async (id) => {
   await draftsStore.removeItem(id);
+};
+
+/**
+ * Emergency Disaster Recovery Export:
+ * Exports all pending, failed, and synced records + drafts directly from IndexedDB
+ * as a timestamped JSON file that can be ingested manually or saved on external drives.
+ */
+export const exportOfflineLedger = async () => {
+  const submissions = await getAllSubmissions();
+  const drafts = await getAllDrafts();
+
+  const ledger = {
+    exportedAt: new Date().toISOString(),
+    sourceApp: "HaloFormCraft-PWA",
+    version: "2.5.0",
+    summary: {
+      totalSubmissions: submissions.length,
+      pendingCount: submissions.filter(s => s.syncStatus === 'PENDING' || s.syncStatus === 'FAILED' || s.syncStatus === 'DLQ_REVIEW').length,
+      syncedCount: submissions.filter(s => s.syncStatus === 'SYNCED').length,
+      draftsCount: drafts.length
+    },
+    submissions,
+    drafts
+  };
+
+  const jsonString = JSON.stringify(ledger, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `halo-offline-ledger-${dateStr}-${Date.now().toString().slice(-4)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return ledger;
+};
+
+/**
+ * Clean up successfully synced submissions older than 7 days
+ * to keep IndexedDB lean and fast.
+ */
+export const pruneSyncedSubmissions = async (maxAgeDays = 7) => {
+  const submissions = await getAllSubmissions();
+  const now = Date.now();
+  const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+
+  for (const sub of submissions) {
+    if (sub.syncStatus === 'SYNCED') {
+      const subTime = new Date(sub.timestamp).getTime();
+      if (now - subTime > maxAgeMs) {
+        await removeSubmission(sub.id);
+      }
+    }
+  }
 };
 

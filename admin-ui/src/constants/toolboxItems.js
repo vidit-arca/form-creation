@@ -25,6 +25,7 @@ export const TOOLBOX_ITEMS = [
   { type: 'dob_age', label: 'DOB & Age', category: 'Health' },
   { type: 'bmi', label: 'BMI Calculator', category: 'Health' },
   { type: 'calculated_score', label: 'Calculated Score', category: 'Health' },
+  { type: 'dietary_recall_24h', label: '24-Hour Dietary Recall', category: 'Health' },
   { type: 'section_header', label: 'Section Header', category: 'Layout' },
   { type: 'instruction', label: 'Instruction Text', category: 'Layout' },
   { type: 'divider', label: 'Divider Line', category: 'Layout' },

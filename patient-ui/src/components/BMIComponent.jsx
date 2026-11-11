@@ -57,31 +57,35 @@ export function BMIComponent({ field, value, onChange }) {
   };
 
   const getCategoryColor = (cat) => {
-    if (cat === 'Underweight') return 'bg-blue-100 text-blue-800 border-blue-200';
-    if (cat === 'Normal') return 'bg-green-100 text-green-800 border-green-200';
-    if (cat === 'Overweight') return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    if (cat === 'Obese') return 'bg-red-100 text-red-800 border-red-200';
-    return 'bg-gray-100 text-gray-500 border-gray-200';
+    if (cat === 'Underweight') return 'bg-sky-50 text-sky-800 border-sky-200';
+    if (cat === 'Normal') return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+    if (cat === 'Overweight') return 'bg-amber-50 text-amber-800 border-amber-200';
+    if (cat === 'Obese') return 'bg-rose-50 text-rose-800 border-rose-200';
+    return 'bg-slate-100 text-slate-600 border-slate-200';
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-      <div className="flex flex-col sm:flex-row gap-4 mb-4">
+    <div className="bg-white border border-slate-200/90 rounded-xl p-4 sm:p-5 shadow-2xs">
+      <div className="flex flex-col sm:flex-row gap-4 mb-3">
         <div className="flex-1">
-          <label className="text-sm font-bold text-gray-700 block mb-2">Height ({heightUnit}) {field.required && <span className="text-red-500">*</span>}</label>
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block mb-1">
+            Height ({heightUnit}) {field.required && <span className="text-rose-500">*</span>}
+          </label>
           <input 
             type="number" 
-            className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+            className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400"
             value={height}
             placeholder={`e.g. ${isMetric ? '175' : '70'}`}
             onChange={(e) => handleUpdate(parseFloat(e.target.value) || '', weight)}
           />
         </div>
         <div className="flex-1">
-          <label className="text-sm font-bold text-gray-700 block mb-2">Weight ({weightUnit}) {field.required && <span className="text-red-500">*</span>}</label>
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block mb-1">
+            Weight ({weightUnit}) {field.required && <span className="text-rose-500">*</span>}
+          </label>
           <input 
             type="number" 
-            className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition bg-white"
+            className="w-full border border-slate-300 p-2.5 text-sm rounded-lg focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400"
             value={weight}
             placeholder={`e.g. ${isMetric ? '70' : '150'}`}
             onChange={(e) => handleUpdate(height, parseFloat(e.target.value) || '')}
@@ -89,18 +93,20 @@ export function BMIComponent({ field, value, onChange }) {
         </div>
       </div>
       
-      <div className="flex items-center justify-between border-t border-gray-100 pt-4 mt-2">
-        <div className="text-sm font-bold text-gray-700">Calculated BMI:</div>
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-2">
+        <div className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">
+          Biometric Score:
+        </div>
+        <div className="flex items-center gap-2.5">
           {bmi ? (
             <>
-              <span className="text-2xl font-black text-gray-800">{bmi}</span>
-              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getCategoryColor(category)} uppercase tracking-wider`}>
+              <span className="text-xl font-mono font-black text-slate-950">{bmi}</span>
+              <span className={`px-2.5 py-0.5 rounded font-mono text-xs font-bold border ${getCategoryColor(category)} uppercase tracking-wider`}>
                 {category}
               </span>
             </>
           ) : (
-            <span className="text-gray-400 font-medium">Enter height and weight</span>
+            <span className="text-xs font-mono text-slate-400">Awaiting inputs</span>
           )}
         </div>
       </div>

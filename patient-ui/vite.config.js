@@ -33,7 +33,35 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/submissions'),
+            method: 'POST',
+            handler: 'NetworkOnly',
+            options: {
+              backgroundSync: {
+                name: 'clinical-intake-background-sync',
+                options: {
+                  maxRetentionTime: 24 * 60 // Retry for max of 24 Hours (in minutes)
+                }
+              }
+            }
+          }
+        ]
       }
     })
   ],
+  server: {
+    proxy: {
+      // Dev proxy: /api/food/ → local food-api running on port 8001
+      // Run: cd food-api && uvicorn main:app --port 8001
+      // (or use port-forward: kubectl port-forward svc/food-api 8001:8000 -n haloform-prod)
+      '/api/food': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/food/, ''),
+      },
+    },
+  },
 })
+

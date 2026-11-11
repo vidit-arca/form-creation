@@ -150,6 +150,20 @@ export function SettingsPanel({ activeField, activeFieldId, setActiveFieldId, up
                 </label>
               </div>
 
+              <div className="mt-4">
+                <label className="text-sm font-bold text-gray-700 block mb-2">Field Width (Layout)</label>
+                <select
+                  className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                  value={activeField.width || 'default'}
+                  onChange={(e) => updateField(activeField.id, { width: e.target.value })}
+                >
+                  <option value="default">Default (Auto Sizing)</option>
+                  <option value="full">Full Width (100%)</option>
+                  <option value="half">Half Width (50%)</option>
+                  <option value="third">One-Third (33%)</option>
+                </select>
+              </div>
+
               <div className="border-t border-gray-100 pt-6 mt-6">
                 <h3 className="text-sm font-bold text-gray-700 mb-3">Validation Constraints</h3>
                 {['text', 'phone', 'email'].includes(activeField.type) && (

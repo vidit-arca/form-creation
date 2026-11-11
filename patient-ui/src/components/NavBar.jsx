@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { getAllDrafts, getAllSubmissions } from '../utils/storage';
 import { useNetworkStatus } from '../utils/useNetworkStatus';
-import { FolderHeart, History, Wifi, WifiOff } from 'lucide-react';
+import { FileEdit, History, Wifi, WifiOff, Activity, Building2 } from 'lucide-react';
 import { readContext } from '../utils/context';
 
 export function NavBar() {
@@ -28,67 +28,115 @@ export function NavBar() {
   };
 
   useEffect(() => {
-    // Read session context via validated helper
-      const ctx = readContext();
-      setContext(ctx);
+    const ctx = readContext();
+    setContext(ctx);
 
     updateCounts();
-    // Poll every 3 seconds to keep counts perfectly in sync across different pages
     const interval = setInterval(updateCounts, 3000);
     return () => clearInterval(interval);
   }, [location.pathname]);
 
-  const hasContext = context.project || context.site;
+  const hasContext = Boolean(context.project || context.site);
 
   return (
-    <nav className="bg-white/85 backdrop-blur-xl border-b border-emerald-100/60 sticky top-0 z-50 shadow-sm transition-all duration-300">
-      <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-        {/* Logo */}
+    <nav className="radiant-header sticky top-0 z-50 transition-all">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        {/* Brandmark + Station Context */}
         <div className="flex items-center gap-3">
-          <Link to={hasContext ? "/forms" : "/"} className="flex items-center gap-3 hover:opacity-90 transition">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25 ring-1 ring-emerald-400/20">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342" />
-              </svg>
+          <Link
+            to={hasContext ? "/forms" : "/"}
+            className="flex items-center gap-3 group focus:outline-none"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-600 to-emerald-700 flex items-center justify-center text-white shadow-xs group-hover:shadow transition">
+              <span className="font-mono font-black text-sm tracking-tighter">HF</span>
             </div>
-            <div className="flex flex-col leading-none gap-0.5">
-              <span className="text-[18px] font-extrabold tracking-tight">
-                <span className="bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 bg-clip-text text-transparent">Halo</span><span className="text-slate-800 ml-0.5">Health<span className="ml-[2px]">Forms</span></span>
+            <div className="flex flex-col leading-none">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[15px] font-black tracking-tight text-slate-950">Halo</span>
+                <span className="text-[15px] font-medium text-slate-600">HealthForms</span>
+                <span className="hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200/80 font-semibold uppercase">
+                  Patient
+                </span>
+              </div>
+              <span className="text-[10.5px] text-slate-400 font-mono mt-0.5">
+                Clinical Form Client · v2.5.0
               </span>
-              <span className="text-[9.5px] font-medium text-slate-400 tracking-[0.06em] uppercase">Patient Portal</span>
             </div>
           </Link>
+
+          {/* Active Site/Study Context Pill */}
+          {hasContext && (
+            <div className="hidden md:flex items-center gap-1.5 pl-3 border-l border-slate-200 text-xs">
+              <span className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-teal-900 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/70">
+                <Building2 className="w-3 h-3 text-teal-700" />
+                {context.site ? `SITE-${context.site}` : context.project}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Navigation Links */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          {/* Connection Status Indicator */}
-          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300 ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50' : 'bg-rose-50 text-rose-700 border border-rose-200/50 animate-pulse'}`}>
+        {/* Navigation Actions */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Connection Status Pill */}
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold transition-all ${
+              isOnline
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/70'
+                : 'bg-rose-50 text-rose-800 border border-rose-200 animate-pulse'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isOnline ? 'bg-emerald-500' : 'bg-rose-500'
+              }`}
+            />
             {isOnline ? (
               <>
-                <Wifi className="w-3.5 h-3.5" />
+                <Wifi className="w-3.5 h-3.5 text-emerald-600" />
                 <span className="hidden sm:inline">Online</span>
               </>
             ) : (
               <>
-                <WifiOff className="w-3.5 h-3.5" />
+                <WifiOff className="w-3.5 h-3.5 text-rose-600" />
                 <span>Offline</span>
               </>
             )}
           </div>
 
-          {/* Drafts Link */}
+          {/* Forms Route Link (if context active) */}
+          {hasContext && (
+            <Link
+              to="/forms"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                location.pathname === '/forms'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Forms</span>
+            </Link>
+          )}
+
+          {/* Saved Drafts Link */}
           <Link
             to="/drafts"
-            className={`relative flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-300 ${location.pathname === '/drafts'
-                ? 'bg-amber-50 text-amber-800 border border-amber-200/60 shadow-sm'
-                : 'text-slate-600 hover:text-amber-700 hover:bg-amber-50/50 border border-transparent'
-              }`}
+            className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              location.pathname === '/drafts'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
           >
-            <FolderHeart className="w-4 h-4" />
-            <span className="hidden sm:inline">Saved Drafts</span>
+            <FileEdit className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Drafts</span>
             {draftCount > 0 && (
-              <span className="absolute -top-1.5 -right-1 bg-amber-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+              <span
+                className={`font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                  location.pathname === '/drafts'
+                    ? 'bg-teal-400 text-slate-950'
+                    : 'bg-amber-100 text-amber-900 border border-amber-300'
+                }`}
+              >
                 {draftCount}
               </span>
             )}
@@ -97,15 +145,16 @@ export function NavBar() {
           {/* Submissions History Link */}
           <Link
             to="/history"
-            className={`relative flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-300 ${location.pathname === '/history'
-                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/60 shadow-sm'
-                : 'text-slate-600 hover:text-emerald-750 hover:bg-emerald-50/50 border border-transparent'
-              }`}
+            className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              location.pathname === '/history'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
           >
-            <History className="w-4 h-4" />
+            <History className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">History</span>
             {pendingSyncCount > 0 && (
-              <span className="absolute -top-1.5 -right-1 bg-rose-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse">
                 {pendingSyncCount}
               </span>
             )}

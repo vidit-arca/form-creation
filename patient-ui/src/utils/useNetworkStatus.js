@@ -7,7 +7,8 @@ export const useNetworkStatus = () => {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      syncPendingSubmissions(); // Auto-sync when back online
+      console.log('[NetworkStatus] Connection restored. Flushing queue immediately...');
+      syncPendingSubmissions(true); // Force immediate sync attempt when reconnected
     };
     const handleOffline = () => setIsOnline(false);
 

@@ -1,5 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
+import {
+  Building2,
+  Plus,
+  ArrowLeft,
+  Trash2,
+  Download,
+  Copy,
+  Hash,
+  X
+} from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -13,245 +24,357 @@ export function HospitalManager() {
   const [siteCode, setSiteCode] = useState('');
   const [address, setAddress] = useState('');
 
+  // Patient portal base URL
+  const PATIENT_BASE = import.meta.env.VITE_PATIENT_URL || 'http://localhost:5174';
+
   const fetchData = () => {
     Promise.all([
-      fetch(`${API_URL}/admin/projects/${projectId}`).then(r => r.json()),
-      fetch(`${API_URL}/admin/projects/${projectId}/hospitals`).then(r => r.json()),
-    ]).then(([proj, hosps]) => {
-      setProject(proj);
-      setHospitals(Array.isArray(hosps) ? hosps : []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+      fetch(`${API_URL}/admin/projects/${projectId}`).then((r) => r.json()),
+      fetch(`${API_URL}/admin/projects/${projectId}/hospitals`).then((r) => r.json()),
+    ])
+      .then(([proj, hosps]) => {
+        setProject(proj);
+        setHospitals(Array.isArray(hosps) ? hosps : []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [projectId]);
+  useEffect(() => {
+    fetchData();
+  }, [projectId]);
 
-  // Auto-generate site code from name
   const handleNameChange = (val) => {
     setName(val);
-    const words = val.trim().split(/\s+/);
-    let code = '';
-    if (words.length >= 3) {
-      code = words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
-    } else if (words.length === 2) {
-      code = (words[0].slice(0, 2) + words[1][0]).toUpperCase();
-    } else if (words.length === 1) {
-      code = words[0].slice(0, 3).toUpperCase();
+    if (!siteCode || siteCode.length <= 3) {
+      setSiteCode(
+        val
+          .toUpperCase()
+          .replace(/[^A-Z]/g, '')
+          .slice(0, 3)
+      );
     }
-    setSiteCode(code);
   };
 
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!name.trim() || !siteCode.trim()) return;
-    const res = await fetch(`${API_URL}/admin/projects/${projectId}/hospitals`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, site_code: siteCode, address: address || null, contact_info: null })
-    });
-    if (res.ok) {
-      setShowModal(false);
-      setName(''); setSiteCode(''); setAddress('');
-      fetchData();
-    } else {
-      const err = await res.json();
-      alert(err.detail || 'Failed to add hospital');
+    try {
+      const res = await fetch(`${API_URL}/admin/projects/${projectId}/hospitals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, site_code: siteCode, address }),
+      });
+      if (res.ok) {
+        setShowModal(false);
+        setName('');
+        setSiteCode('');
+        setAddress('');
+        fetchData();
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Site mapping failed.');
+      }
+    } catch {
+      alert('Could not connect to backend server.');
     }
   };
 
   const handleRemove = async (hospitalId, hospitalName) => {
-    if (!confirm(`Remove "${hospitalName}" from this project?`)) return;
-    await fetch(`${API_URL}/admin/projects/${projectId}/hospitals/${hospitalId}`, { method: 'DELETE' });
+    if (!confirm(`Deactivate "${hospitalName}" from this study project?`)) return;
+    await fetch(`${API_URL}/admin/projects/${projectId}/hospitals/${hospitalId}`, {
+      method: 'DELETE',
+    });
     fetchData();
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-slate-200 border-t-blue-600"></div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center font-mono text-xs text-blue-800">
+        <span className="w-7 h-7 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3 mr-3" />
+        <span>RETRIEVING SITE PARTICIPANTS...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-
-      {/* ─── Top Navigation ─── */}
-      <nav className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div className="min-h-screen radiant-canvas text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white flex flex-col relative overflow-hidden">
+      {/* ─── Top Clinical Navigation Bar ─── */}
+      <header className="radiant-header sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25 ring-1 ring-blue-500/10">
-                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+            <Link to="/" className="flex items-center gap-3 group">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-extrabold text-sm tracking-wide shadow-sm shadow-blue-700/25 ring-1 ring-white/30">
+                HF
               </div>
-              <div className="flex flex-col leading-none gap-0.5">
-                <span className="text-[18px] font-extrabold tracking-tight">
-                  <span className="bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-600 bg-clip-text text-transparent">Halo</span><span className="text-slate-800 ml-0.5">Form<span className="ml-[2px]">Craft</span></span>
-                </span>
-                <span className="text-[9.5px] font-medium text-slate-400 tracking-[0.06em] uppercase">Admin Platform</span>
-              </div>
+              <span className="font-bold text-base tracking-tight text-slate-950 hidden sm:inline">
+                Halo<span className="text-blue-600">Form</span>Craft
+              </span>
             </Link>
-            <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-            <Link to={`/projects/${projectId}`} className="text-sm font-medium text-slate-500 hover:text-blue-600 transition">{project?.name}</Link>
-            <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-            <span className="text-sm font-medium text-slate-700">Hospitals</span>
-          </div>
-          <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md">A</div>
-        </div>
-      </nav>
 
-      <div className="max-w-5xl mx-auto px-6 lg:px-8 py-10">
-
-        {/* ─── Header ─── */}
-        <div className="mb-10">
-          <Link to={`/projects/${projectId}`} className="text-sm text-slate-500 hover:text-blue-600 transition mb-3 inline-flex items-center gap-1">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
-            Back to {project?.name}
-          </Link>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Hospitals & Centers</h1>
-          <p className="text-slate-500 mt-2 text-lg">Map hospitals and field locations to <strong className="text-slate-700">{project?.name}</strong></p>
-        </div>
-
-        {/* ─── Add Hospital CTA ─── */}
-        <div className="bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 rounded-2xl p-8 mb-10 shadow-xl shadow-emerald-600/10 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute -right-10 -top-10 w-56 h-56 bg-white rounded-full"></div>
-            <div className="absolute left-1/2 -bottom-16 w-72 h-72 bg-white rounded-full"></div>
-          </div>
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-2">
-              <svg className="w-6 h-6 text-emerald-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              <h2 className="text-xl font-bold text-white">Add Hospital / Center</h2>
-            </div>
-            <p className="text-emerald-200 text-sm mb-6">Map a new hospital, camp, or field location to this project. Each site gets a unique code for metadata tagging.</p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="bg-white text-emerald-700 px-7 py-3.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:bg-emerald-50 transition-all active:scale-95 text-[15px]"
+            <span className="text-slate-300 text-sm">/</span>
+            <Link
+              to={`/projects/${projectId}`}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition font-mono truncate max-w-[150px]"
             >
-              + Add Hospital
-            </button>
+              {project?.name}
+            </Link>
+            <span className="text-slate-300 text-sm">/</span>
+            <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/70 uppercase">
+              Participating Sites
+            </span>
+          </div>
+
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-mono font-bold text-xs flex items-center justify-center shadow-xs">
+            AD
           </div>
         </div>
+      </header>
 
-        {/* ─── Hospitals List ─── */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-slate-900">Mapped Hospitals</h2>
-          <p className="text-slate-500 text-sm mt-1">{hospitals.length} hospital{hospitals.length !== 1 ? 's' : ''} in this project</p>
-        </div>
+      {/* ─── Main Content Surface ─── */}
+      <main className="relative z-10 flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        {/* Header Block */}
+        <section className="pb-6 border-b border-slate-200/80 mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <Link
+              to={`/projects/${projectId}`}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-blue-600 transition mb-3 font-mono"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>RETURN TO {project?.name?.toUpperCase()}</span>
+            </Link>
 
-        {hospitals.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-16 text-center shadow-sm">
-            <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
-              <svg className="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
-              </svg>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950">
+              Participating Hospitals &amp; Field Centers
+            </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Map clinical institutions and assign unique 3-letter site codes for cohort partition.
+            </p>
+          </div>
+
+          <button
+            onClick={() => setShowModal(true)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition active:translate-y-[1px] shadow-sm shadow-blue-600/20 shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Map New Hospital Site</span>
+          </button>
+        </section>
+
+        {/* Site List Ledger */}
+        <section>
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+            <h2 className="text-sm font-bold text-slate-950 uppercase tracking-wide font-mono">
+              Mapped Institutions ({hospitals.length})
+            </h2>
+          </div>
+
+          {hospitals.length === 0 ? (
+            <div className="radiant-card rounded-xl p-12 text-center">
+              <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-3 stroke-[1.25]" />
+              <h3 className="text-sm font-bold text-slate-800">No medical sites mapped yet</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                Add participating hospitals or field clinics to generate site-specific QR routing codes.
+              </p>
             </div>
-            <h3 className="text-xl font-bold text-slate-700 mb-2">No hospitals mapped</h3>
-            <p className="text-slate-500 max-w-sm mx-auto">Add your first hospital or center to start collecting site-specific data.</p>
-          </div>
-        ) : (
-          <div className="grid gap-3">
-            {hospitals.map(hospital => (
-              <div key={hospital.id} className="group bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300/80 transition-all duration-300">
-                <div className="p-5 flex items-center justify-between">
-                  <div className="flex items-center gap-4 min-w-0">
-                    {/* Site Code Badge */}
-                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm flex-shrink-0">
-                      <span className="text-white font-extrabold text-sm tracking-wider">{hospital.site_code}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-lg text-slate-900 truncate">{hospital.name}</h3>
-                      <div className="flex items-center gap-3 mt-1 flex-wrap">
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-mono">
-                          {hospital.site_code}
-                        </span>
-                        {hospital.address && (
-                          <span className="text-xs text-slate-400 flex items-center gap-1">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
-                            {hospital.address}
+          ) : (
+            <div className="grid gap-4">
+              {hospitals.map((hospital) => {
+                const qrUrl = `${PATIENT_BASE}/?project=${project?.slug}&site=${hospital.site_code}`;
+                const qrId = `qr-${hospital.site_code}`;
+
+                return (
+                  <div
+                    key={hospital.id}
+                    className="radiant-card rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 hover:border-blue-300 hover:shadow-xs transition"
+                  >
+                    <div className="flex items-start gap-4 min-w-0">
+                      {/* Interactive QR Preview Card */}
+                      <div
+                        id={qrId}
+                        className="bg-white p-2 rounded-lg border border-slate-200 shrink-0 shadow-2xs"
+                      >
+                        <QRCodeSVG value={qrUrl} size={84} level="H" includeMargin={true} />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-base text-slate-950">{hospital.name}</h3>
+                          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200/80">
+                            SITE: {hospital.site_code}
                           </span>
+                        </div>
+
+                        {hospital.address && (
+                          <p className="text-xs text-slate-500 mt-1">{hospital.address}</p>
                         )}
-                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${hospital.is_active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${hospital.is_active ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                          {hospital.is_active ? 'Active' : 'Inactive'}
-                        </span>
+
+                        <div className="mt-2.5">
+                          <code className="text-[10px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-1 rounded inline-block font-mono max-w-md truncate">
+                            {qrUrl}
+                          </code>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Site Actions */}
+                    <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                      <button
+                        onClick={() => {
+                          const svg = document.querySelector(`#${qrId} svg`);
+                          if (!svg) return;
+                          const canvas = document.createElement('canvas');
+                          const ctx = canvas.getContext('2d');
+                          const svgData = new XMLSerializer().serializeToString(svg);
+                          const img = new Image();
+                          img.onload = () => {
+                            canvas.width = img.width * 2;
+                            canvas.height = img.height * 2;
+                            ctx.fillStyle = 'white';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            const link = document.createElement('a');
+                            link.download = `QR_${project?.slug}_${hospital.site_code}.png`;
+                            link.href = canvas.toDataURL('image/png');
+                            link.click();
+                          };
+                          img.src =
+                            'data:image/svg+xml;base64,' +
+                            btoa(unescape(encodeURIComponent(svgData)));
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 hover:border-slate-300 transition"
+                        title="Download QR code image"
+                      >
+                        <Download className="w-3.5 h-3.5 text-slate-500" />
+                        <span>PNG</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(qrUrl);
+                          alert('Station URL copied to clipboard.');
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 hover:border-slate-300 transition"
+                        title="Copy direct intake link"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Copy</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleRemove(hospital.id, hospital.name)}
+                        className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition border border-transparent hover:border-rose-100"
+                        title="Deactivate Site"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => handleRemove(hospital.id, hospital.name)}
-                    className="text-slate-400 hover:text-red-500 transition p-2 rounded-lg hover:bg-red-50"
-                    title="Remove hospital"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </main>
+
+      {/* ─── Modal: Map Hospital ─── */}
+      {showModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="map-site-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs"
+        >
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-6 sm:p-7 relative animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 id="map-site-title" className="text-base font-bold text-slate-950">
+                    Map New Participating Site
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Add clinical institution and generate permanent station QR code.
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ─── Footer ─── */}
-      <div className="border-t border-slate-200/60 bg-white/40 backdrop-blur-sm mt-16">
-        <div className="max-w-5xl mx-auto px-6 lg:px-8 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-md flex items-center justify-center">
-              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                aria-label="Close site mapping dialog"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <span className="text-sm font-semibold"><span className="bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">Halo</span><span className="text-slate-600 ml-0.5">Form<span className="ml-[2px]">Craft</span></span></span>
-            <span className="text-slate-300 text-xs">·</span>
-            <span className="text-xs text-slate-400">Admin Panel</span>
-          </div>
-          <span className="text-xs text-slate-400">Built with React + FastAPI</span>
-        </div>
-      </div>
 
-      {/* ─── Add Hospital Modal ─── */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 border border-slate-200" onClick={e => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold text-slate-900 mb-6">Add Hospital / Center</h2>
-            <form onSubmit={handleCreate} className="space-y-5">
+            <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Hospital Name *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Hospital / Institution Name *
+                </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g. Baptist Hospital Bangalore"
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition"
+                  placeholder="e.g. All India Institute of Medical Sciences (AIIMS)"
+                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 transition"
                   required
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Site Code *</label>
-                <input
-                  type="text"
-                  value={siteCode}
-                  onChange={(e) => setSiteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                  placeholder="e.g. BPA"
-                  maxLength={6}
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition font-mono text-lg tracking-widest"
-                  required
-                />
-                <p className="text-xs text-slate-400 mt-1">3-6 character code used for data tagging (auto-generated from name)</p>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  3-Letter Site Code *
+                </label>
+                <div className="relative">
+                  <Hash className="w-4 h-4 text-blue-600 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={siteCode}
+                    onChange={(e) =>
+                      setSiteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5))
+                    }
+                    placeholder="e.g. DEL"
+                    maxLength={5}
+                    className="w-full border border-slate-300 rounded-lg pl-9 pr-3.5 py-2.5 text-xs text-slate-900 font-mono font-semibold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 transition"
+                    required
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 font-mono">
+                  Embedded into participant QR codes for automatic multi-center indexing.
+                </p>
               </div>
+
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Address</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Physical Address / Department Notes
+                </label>
                 <input
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="e.g. Bellary Road, Bangalore"
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition"
+                  placeholder="e.g. Cardiology OPD, Ansari Nagar, New Delhi"
+                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 transition"
                 />
               </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-slate-100 text-slate-700 px-5 py-3 rounded-xl font-semibold hover:bg-slate-200 transition">Cancel</button>
-                <button type="submit" className="flex-1 bg-emerald-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-emerald-700 shadow-sm hover:shadow-md transition active:scale-95">Add Hospital</button>
+
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition active:translate-y-[1px] shadow-sm shadow-blue-600/20"
+                >
+                  Register Site Code
+                </button>
               </div>
             </form>
           </div>

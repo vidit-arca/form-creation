@@ -146,6 +146,23 @@ export function Canvas({ schemaData, activeFieldId, setActiveFieldId, duplicateF
                         </div>
                       </div>
                     )}
+                    {field.type === 'dietary_recall_24h' && (
+                      <div className="border border-emerald-200 bg-emerald-50 rounded-xl p-4 space-y-2">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-lg">🥗</span>
+                          <span className="text-sm font-semibold text-emerald-700">24-Hour Dietary Recall (AI-Powered)</span>
+                        </div>
+                        {(field.config?.mealSlots || ['Breakfast', 'Lunch', 'Dinner']).slice(0, 3).map((slot) => (
+                          <div key={slot} className="flex items-center justify-between bg-white border border-emerald-100 rounded-lg px-3 py-2 text-sm text-gray-500">
+                            <span className="font-medium text-gray-600">{slot}</span>
+                            <span className="text-xs text-emerald-500">Type & match Anuvaad items…</span>
+                          </div>
+                        ))}
+                        {(field.config?.mealSlots?.length || 3) > 3 && (
+                          <p className="text-xs text-gray-400 pl-1">+ {(field.config.mealSlots.length - 3)} more meal slots…</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
