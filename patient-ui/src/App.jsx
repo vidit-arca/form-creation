@@ -19,6 +19,7 @@ import { SubmissionHistory as OfflineHistory } from './components/SubmissionHist
 import { SavedDrafts } from './components/SavedDrafts';
 import { IntakeForm } from './components/IntakeForm';
 import { DietaryRecallField } from './components/DietaryRecallField';
+import { SystemicValuesReview } from './components/SystemicValuesReview';
 
 const reactSelectPatientStyles = {
   control: (base, state) => ({
@@ -908,66 +909,17 @@ function FormRenderer() {
           <form onSubmit={handleSubmit(onSubmit)} className="p-6 sm:p-8 flex flex-wrap -mx-3">
           {isReviewMode ? (
             <div className="w-full px-3 mb-6">
-              <div className="flex items-center justify-between pb-3 mb-6 border-b border-slate-200">
-                <h2 className="text-base font-bold text-slate-950">Verification &amp; Review</h2>
-                <span className="font-mono text-xs text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded font-semibold border border-teal-200/60">
-                  Pre-Submission Audit
-                </span>
-              </div>
-              <div className="space-y-4">
-                {pages.map((page, pIdx) => {
-                  const visibleFields = page.fields.filter(f => {
-                    const logicRes = evaluateLogic(f.logic, formValues);
-                    return logicRes.isVisible;
-                  });
-                  if (visibleFields.length === 0) return null;
-                  
-                  return (
-                    <div key={pIdx} className="bg-slate-50/60 rounded-xl p-5 border border-slate-200/80">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-teal-800 font-mono mb-3">
-                        {page.title || `Section ${pIdx + 1}`}
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3.5 gap-x-6">
-                        {visibleFields.map(field => {
-                          if (['page_break', 'section_header', 'instruction', 'divider'].includes(field.type)) return null;
-                          let val = getValues(field.id);
-                          
-                          // Format value for display
-                          let displayVal = val;
-                          if (val === undefined || val === null || val === '') {
-                             displayVal = <span className="text-slate-400 italic font-mono text-xs">Not recorded</span>;
-                          } else if (typeof val === 'boolean') {
-                             displayVal = <span className="font-mono font-bold text-xs">{val ? 'Yes' : 'No'}</span>;
-                          } else if (Array.isArray(val)) {
-                             displayVal = val.length > 0 ? val.join(', ') : <span className="text-slate-400 italic font-mono text-xs">None</span>;
-                          } else if (field.type === 'signature') {
-                             displayVal = val ? <img src={val} alt="Signature" className="h-14 border border-slate-200 rounded-lg bg-white p-1" /> : <span className="text-slate-400 italic font-mono text-xs">Not signed</span>;
-                          } else if (field.type === 'image') {
-                             displayVal = val ? <img src={val} alt="Uploaded" className="h-16 rounded-lg border border-slate-200" /> : <span className="text-slate-400 italic font-mono text-xs">No image</span>;
-                          } else if (field.type === 'dietary_recall_24h' && typeof val === 'object') {
-                             displayVal = Object.entries(val).filter(([_, items]) => items && items.length > 0).map(([meal, items]) => (
-                               <div key={meal} className="mb-1 text-xs">
-                                 <strong className="font-semibold text-slate-800">{meal}:</strong>
-                                 <ul className="list-disc list-inside pl-2 text-slate-600">
-                                   {items.map((item, i) => <li key={i}>{typeof item === 'string' ? item : item.name}</li>)}
-                                 </ul>
-                               </div>
-                             ));
-                             if (!displayVal.length) displayVal = <span className="text-slate-400 italic font-mono text-xs">No entries</span>;
-                          }
-                          
-                          return (
-                            <div key={field.id} className="flex flex-col">
-                              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{field.label}</span>
-                              <div className="text-slate-900 font-medium mt-0.5 text-sm">{displayVal}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <SystemicValuesReview
+                formConfig={formConfig}
+                pages={pages}
+                getValues={getValues}
+                context={getSiteContext()}
+                onJumpToPage={(targetIndex) => {
+                  setIsReviewMode(false);
+                  setCurrentPageIndex(targetIndex);
+                  window.scrollTo(0, 0);
+                }}
+              />
             </div>
           ) : (
             currentFields.map(field => {

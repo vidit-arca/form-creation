@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { adminConsoleApi } from '../services/adminConsoleApi';
 
 const AuthContext = createContext(null);
 
@@ -121,7 +122,23 @@ export function AuthProvider({ children }) {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error_description || 'Invalid credentials with Keycloak');
+        const reason = err.error_description || 'Invalid credentials with Keycloak';
+        adminConsoleApi.logAuditEvent({
+          action: 'AUTH_LOGIN_FAILED',
+          category: 'AUTHENTICATION',
+          service_origin: 'admin-ui',
+          severity: 'WARNING',
+          status: 'FAILURE',
+          actor_id: username,
+          actor_name: username,
+          actor_email: username.includes('@') ? username : null,
+          actor_role: 'Unauthenticated',
+          entity_type: 'session',
+          entity_id: username,
+          entity_name: `Failed Login: ${username}`,
+          failure_reason: reason,
+        });
+        throw new Error(reason);
       }
 
       const data = await res.json();
@@ -144,6 +161,23 @@ export function AuthProvider({ children }) {
 
       setToken(accessToken);
       setUser(userProfile);
+
+      adminConsoleApi.logAuditEvent({
+        action: 'AUTH_LOGIN_SUCCESS',
+        category: 'AUTHENTICATION',
+        service_origin: 'admin-ui',
+        severity: 'INFO',
+        status: 'SUCCESS',
+        actor_id: userProfile.username,
+        actor_name: userProfile.name,
+        actor_email: userProfile.email,
+        actor_role: userProfile.role,
+        entity_type: 'session',
+        entity_id: userProfile.username,
+        entity_name: `Keycloak Session: ${userProfile.name}`,
+        after_state: { role: userProfile.role, email: userProfile.email },
+      });
+
       return userProfile;
     } finally {
       setLoading(false);
@@ -160,6 +194,22 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    if (user) {
+      adminConsoleApi.logAuditEvent({
+        action: 'AUTH_LOGOUT',
+        category: 'AUTHENTICATION',
+        service_origin: 'admin-ui',
+        severity: 'INFO',
+        status: 'SUCCESS',
+        actor_id: user.username,
+        actor_name: user.name,
+        actor_email: user.email,
+        actor_role: user.role,
+        entity_type: 'session',
+        entity_id: user.username,
+        entity_name: `Session Terminated: ${user.name}`,
+      });
+    }
     setToken(null);
     setUser(null);
     localStorage.removeItem('halo_auth_token');

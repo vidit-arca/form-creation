@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Header } from '../../components/common/Header';
 import { useAuth } from '../../context/AuthContext';
-import { ShieldCheck, Server, Users, Settings, Activity } from 'lucide-react';
+import { ShieldCheck, Server, Users, Settings, Activity, FileText } from 'lucide-react';
 
 export function ConsoleLayout() {
   const location = useLocation();
@@ -12,6 +12,7 @@ export function ConsoleLayout() {
     { to: '/console', label: 'Dashboard', icon: Activity, end: true },
     { to: '/console/users', label: 'User Onboarding', icon: Users },
     { to: '/console/rbac', label: 'RBAC & Access', icon: Server },
+    { to: '/console/audit', label: 'Audit Trail', icon: FileText },
     { to: '/console/logs', label: 'System Logs', icon: Settings },
   ];
 

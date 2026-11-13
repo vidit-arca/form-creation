@@ -16,6 +16,7 @@ import { ConsoleLayout } from './pages/console/ConsoleLayout';
 import { ConsoleDashboard } from './pages/console/ConsoleDashboard';
 import { UserManagerPage } from './pages/console/UserManagerPage';
 import { RoleManagerPage } from './pages/console/RoleManagerPage';
+import { AuditTrailPage } from './pages/console/AuditTrailPage';
 import { LogsViewerPage } from './pages/console/LogsViewerPage';
 
 // Login Page
@@ -83,6 +84,7 @@ function App() {
             <Route index element={<ConsoleDashboard />} />
             <Route path="users" element={<UserManagerPage />} />
             <Route path="rbac" element={<RoleManagerPage />} />
+            <Route path="audit" element={<AuditTrailPage />} />
             <Route path="logs" element={<LogsViewerPage />} />
           </Route>
 

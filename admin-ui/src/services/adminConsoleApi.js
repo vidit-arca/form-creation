@@ -93,5 +93,31 @@ export const adminConsoleApi = {
   // ─── Logs & Telemetry (:8004) ───
   getServiceLogs: (serviceName, limit = 100) => request(`${LOGS_URL}/logs/${serviceName}?limit=${limit}`).catch(() => []),
   getContainerStats: () => request(`${LOGS_URL}/containers/stats`).catch(() => null),
+
+  // ─── Centralized Audit Trail (:8004) ───
+  getAuditEvents: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '' && v !== 'ALL') {
+        query.set(k, String(v));
+      }
+    });
+    return request(`${LOGS_URL}/audit/events?${query.toString()}`).catch(() => ({ items: [], total: 0, page: 1, page_size: 25 }));
+  },
+  getAuditEventById: (id) => request(`${LOGS_URL}/audit/events/${id}`),
+  logAuditEvent: (data) =>
+    request(`${LOGS_URL}/audit/events`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }).catch(() => null),
+  exportAuditCsvUrl: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '' && v !== 'ALL') {
+        query.set(k, String(v));
+      }
+    });
+    return `${LOGS_URL}/audit/export?${query.toString()}`;
+  },
 };
 

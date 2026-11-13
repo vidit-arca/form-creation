@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 import models, schemas
 from database import engine, get_db
+from audit_client import emit_audit_event_background
 import csv
 import io
 import datetime
@@ -64,6 +65,19 @@ def create_form(form: schemas.FormCreate, db: Session = Depends(get_db), admin=D
     db.add(db_version)
     db.commit()
     db.refresh(db_form)
+
+    emit_audit_event_background(
+        action="FORM_CREATED",
+        category="FORM_CRAFT",
+        service_origin="backend",
+        actor_id=str(admin.id),
+        actor_name=admin.username,
+        actor_role="Admin",
+        entity_type="form",
+        entity_id=str(db_form.id),
+        entity_name=db_form.title,
+        after_state={"title": db_form.title, "description": db_form.description, "version": 1},
+    )
     return db_form
 
 @app.get("/api/admin/forms", response_model=List[schemas.Form])
@@ -85,11 +99,26 @@ def update_draft(form_id: int, version_id: int, version_update: schemas.FormVers
     if db_version.status != "DRAFT":
         raise HTTPException(status_code=400, detail="Only DRAFT versions can be edited")
     
+    old_schema = db_version.schema
     db_version.schema = version_update.schema_data
     db_version.ui_schema = version_update.ui_schema
     db_version.logic_schema = version_update.logic_schema
     db.commit()
     db.refresh(db_version)
+
+    emit_audit_event_background(
+        action="FORM_SCHEMA_UPDATED",
+        category="FORM_CRAFT",
+        service_origin="backend",
+        actor_id=str(admin.id),
+        actor_name=admin.username,
+        actor_role="Admin",
+        entity_type="form",
+        entity_id=str(form_id),
+        entity_name=f"Form #{form_id} Draft v{db_version.version_number}",
+        before_state={"fields_count": len(old_schema or []), "schema": old_schema},
+        after_state={"fields_count": len(version_update.schema_data or []), "schema": version_update.schema_data},
+    )
     return db_version
 
 @app.post("/api/admin/forms/{form_id}/publish")
@@ -115,6 +144,20 @@ def publish_form(form_id: int, db: Session = Depends(get_db), admin=Depends(get_
     )
     db.add(new_draft)
     db.commit()
+
+    emit_audit_event_background(
+        action="FORM_PUBLISHED",
+        category="FORM_CRAFT",
+        service_origin="backend",
+        actor_id=str(admin.id),
+        actor_name=admin.username,
+        actor_role="Admin",
+        entity_type="form",
+        entity_id=str(form_id),
+        entity_name=f"Form #{form_id} v{db_version.version_number}",
+        before_state={"status": "DRAFT", "version": db_version.version_number},
+        after_state={"status": "PUBLISHED", "version": db_version.version_number, "published_at": str(db_version.published_at)},
+    )
     return {"message": "Form published successfully"}
 
 @app.get("/api/admin/forms/{form_id}/submissions")
@@ -353,6 +396,21 @@ def submit_form(
     try:
         db.commit()
         db.refresh(db_sub)
+        
+        emit_audit_event_background(
+            action="SUBMISSION_RECEIVED",
+            category="CLINICAL_INTAKE",
+            service_origin="backend",
+            actor_id=str(patient.id),
+            actor_name=patient.username,
+            actor_role="Patient",
+            entity_type="submission",
+            entity_id=str(db_sub.id),
+            entity_name=f"Form #{form_id} Submission",
+            site_code=site,
+            station_id=center,
+            after_state={"form_id": form_id, "submission_id": db_sub.id, "client_uuid": idempotency_key},
+        )
     except Exception as e:
         db.rollback()
         # Concurrency safety: if another thread committed the same idempotency_key in parallel
@@ -552,6 +610,19 @@ def create_project_form(
     db.add(db_version)
     db.commit()
     db.refresh(db_form)
+
+    emit_audit_event_background(
+        action="FORM_CREATED",
+        category="FORM_CRAFT",
+        service_origin="backend",
+        actor_id=str(admin.id),
+        actor_name=admin.username,
+        actor_role="Admin",
+        entity_type="form",
+        entity_id=str(db_form.id),
+        entity_name=db_form.title,
+        after_state={"title": db_form.title, "description": db_form.description, "version": 1},
+    )
     return db_form
 
 @app.get("/api/admin/projects/{project_id}/forms", response_model=List[schemas.Form])
