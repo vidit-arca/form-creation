@@ -53,11 +53,11 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      // Dev proxy: /api/food/ → local food-api running on port 8001
-      // Run: cd food-api && uvicorn main:app --port 8001
-      // (or use port-forward: kubectl port-forward svc/food-api 8001:8000 -n haloform-prod)
+      // Dev proxy: /api/food/ → local food-api running on port 8007 (avoid clash with Halo rbac-service :8001)
+      // Run: cd food-api && uvicorn main:app --port 8007
+      // (or use port-forward: kubectl port-forward svc/food-api 8007:8000 -n haloform-prod)
       '/api/food': {
-        target: 'http://localhost:8001',
+        target: 'http://localhost:8007',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/food/, ''),
       },

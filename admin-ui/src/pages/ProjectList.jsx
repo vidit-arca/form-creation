@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Header } from '../components/common/Header';
 import {
   FolderKanban,
   Building2,
@@ -93,35 +94,7 @@ export function ProjectList() {
   return (
     <div className="min-h-screen radiant-canvas text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white flex flex-col relative overflow-hidden">
       {/* ─── Top Clinical Navigation Bar ─── */}
-      <header className="radiant-header sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Cobalt Blue & Indigo Jewel Brandmark */}
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-extrabold text-sm tracking-wide shadow-sm shadow-blue-700/25 ring-1 ring-white/30">
-              HF
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-base tracking-tight text-slate-950">
-                Halo<span className="text-blue-600">Form</span><span className="text-slate-700">Craft</span>
-              </span>
-              <span className="text-slate-300 text-sm">/</span>
-              <span className="text-xs font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/70 uppercase tracking-wide">
-                Study Registry
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs">
-            <div className="hidden sm:flex items-center gap-2 font-mono px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-blue-800">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-[11px] font-semibold tracking-wide">CLUSTER LIVE</span>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-mono font-bold text-xs flex items-center justify-center shadow-xs">
-              AD
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* ─── Main Content Surface ─── */}
       <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">

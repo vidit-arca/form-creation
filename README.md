@@ -65,14 +65,15 @@ cd /Users/apple/Desktop/form-creation
 docker-compose up --build
 ```
 
-| Service     | URL                    |
-|-------------|------------------------|
-| Gateway     | http://localhost:9090  |
+| Service     | URL                          |
+| ----------- | ---------------------------- |
+| Gateway     | http://localhost:9090        |
 | Admin UI    | http://localhost:9090/admin/ |
-| Patient UI  | http://localhost:9090/ |
-| Backend API | http://localhost:9090/api/  |
+| Patient UI  | http://localhost:9090/       |
+| Backend API | http://localhost:9090/api/   |
 
 To stop:
+
 ```bash
 docker-compose down
 ```
@@ -84,28 +85,31 @@ docker-compose down
 > Share a public URL with your client without deploying to Azure.
 
 **Step 1 — Install cloudflared (once):**
+
 ```bash
 brew install cloudflared
 ```
 
 **Step 2 — Start Docker Compose:**
+
 ```bash
 cd /Users/apple/Desktop/form-creation
 docker-compose up --build
 ```
 
 **Step 3 — Expose via Cloudflare (new terminal):**
+
 ```bash
 cloudflared tunnel --url http://localhost:9090
 ```
 
 You'll get a public URL like `https://xyz.trycloudflare.com`. Share with your client:
 
-| Who          | URL                                      |
-|--------------|------------------------------------------|
-| Patient      | https://xyz.trycloudflare.com/           |
-| Admin        | https://xyz.trycloudflare.com/admin/     |
-| API          | https://xyz.trycloudflare.com/api/       |
+| Who     | URL                                  |
+| ------- | ------------------------------------ |
+| Patient | https://xyz.trycloudflare.com/       |
+| Admin   | https://xyz.trycloudflare.com/admin/ |
+| API     | https://xyz.trycloudflare.com/api/   |
 
 ---
 
@@ -152,10 +156,10 @@ az containerapp update --name patient-ui --resource-group Tejomaya \
 
 ## Live Azure URLs
 
-| Service     | URL |
-|-------------|-----|
+| Service     | URL                                                                         |
+| ----------- | --------------------------------------------------------------------------- |
 | Admin UI    | https://admin-ui--0000008.politesmoke-14d8ddb2.eastus.azurecontainerapps.io |
-| Backend API | https://backend.politesmoke-14d8ddb2.eastus.azurecontainerapps.io/api |
+| Backend API | https://backend.politesmoke-14d8ddb2.eastus.azurecontainerapps.io/api       |
 
 ---
 
